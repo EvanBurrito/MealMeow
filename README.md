@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MealMeow - Cat Food Recommendation App
+
+A personalized cat food recommendation app that calculates your cat's nutritional needs and suggests the best food options based on their profile, your budget, and health goals.
+
+## Features
+
+- **User Authentication**: Sign up and sign in with Supabase Auth
+- **Cat Profiles**: Create and manage multiple cat profiles with:
+  - Age, weight, breed
+  - Gender and neutered status
+  - Activity level and weight goals
+- **Nutrition Calculator**: Science-based calorie calculations using:
+  - RER (Resting Energy Requirement): `70 × (kg^0.75)`
+  - DER (Daily Energy Requirement): `RER × life stage factor`
+- **Food Recommendations**: Personalized food suggestions with:
+  - Daily/monthly cost estimates
+  - Feeding schedule (amount per meal)
+  - Nutrition breakdown
+  - Filter by food type (wet/dry) and budget
+
+## Tech Stack
+
+- **Frontend**: Next.js 14 (App Router)
+- **Database & Auth**: Supabase
+- **Styling**: Tailwind CSS
+- **Deployment**: Vercel
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- A Supabase account
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/yourusername/mealmeow.git
+cd mealmeow
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Set up Supabase
+
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Go to Settings > API to get your project URL and anon key
+3. Copy `.env.local.example` to `.env.local` and fill in your credentials:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+4. Run the schema SQL in your Supabase SQL Editor:
+   - Open `supabase/schema.sql`
+   - Copy and paste into Supabase SQL Editor
+   - Run the query
+
+### 4. Run the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database Schema
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Tables
 
-## Learn More
+- **profiles**: User profiles (linked to Supabase Auth)
+- **cats**: Cat profiles with nutritional data
+- **cat_foods**: Food database with nutrition info and pricing
 
-To learn more about Next.js, take a look at the following resources:
+See `supabase/schema.sql` for the complete schema with sample data.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Nutrition Formulas
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Resting Energy Requirement (RER)
+```
+RER = 70 × (weight_kg ^ 0.75)
+```
 
-## Deploy on Vercel
+### Daily Energy Requirement (DER)
+```
+DER = RER × factor
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Factors:
+- Kitten: 2.5
+- Adult (neutered): 1.2
+- Adult (intact): 1.4
+- Inactive/obesity-prone: 1.0
+- Weight loss: 0.8
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Treat Budget
+Maximum 10% of daily calories should come from treats.
+
+## Deployment
+
+### Deploy to Vercel
+
+1. Push your code to GitHub
+2. Import the project in [Vercel](https://vercel.com)
+3. Add environment variables in Vercel:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Deploy!
+
+## License
+
+MIT
