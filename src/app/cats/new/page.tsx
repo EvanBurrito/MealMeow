@@ -16,11 +16,20 @@ export default async function NewCatPage() {
     redirect('/auth/login');
   }
 
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+
+  const isAdmin = profile?.is_admin || false;
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header isLoggedIn />
+      <Header isLoggedIn isAdmin={isAdmin} />
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
         <CatForm mode="create" />
       </main>
     </div>

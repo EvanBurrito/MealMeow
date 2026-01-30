@@ -7,9 +7,10 @@ import Button from '@/components/ui/Button';
 
 interface HeaderProps {
   isLoggedIn?: boolean;
+  isAdmin?: boolean;
 }
 
-export default function Header({ isLoggedIn = false }: HeaderProps) {
+export default function Header({ isLoggedIn = false, isAdmin = false }: HeaderProps) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -33,6 +34,14 @@ export default function Header({ isLoggedIn = false }: HeaderProps) {
               <Link href="/dashboard">
                 <Button variant="ghost">Dashboard</Button>
               </Link>
+              <Link href="/database">
+                <Button variant="ghost">Database</Button>
+              </Link>
+              {isAdmin && (
+                <Link href="/admin">
+                  <Button variant="ghost">Admin</Button>
+                </Link>
+              )}
               <Button variant="outline" onClick={handleSignOut}>
                 Sign Out
               </Button>

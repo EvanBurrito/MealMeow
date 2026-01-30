@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { NutritionPlan, Cat } from '@/types';
 import { formatAge } from '@/lib/nutrition';
 import Card from '@/components/ui/Card';
@@ -14,7 +15,20 @@ export default function NutritionSummary({
   return (
     <Card variant="elevated" className="bg-gradient-to-br from-orange-50 to-amber-50">
       <div className="flex items-center gap-4 mb-6">
-        <div className="text-5xl">🐱</div>
+        <div className="relative w-20 h-20 rounded-full overflow-hidden border-4 border-orange-200 bg-white flex-shrink-0">
+          {cat.profile_image_url ? (
+            <Image
+              src={cat.profile_image_url}
+              alt={cat.name}
+              fill
+              className="object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-4xl">
+              🐱
+            </div>
+          )}
+        </div>
         <div>
           <h2 className="text-2xl font-bold text-gray-900">{cat.name}&apos;s Nutrition Plan</h2>
           <p className="text-gray-600">

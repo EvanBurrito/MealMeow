@@ -1,8 +1,10 @@
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/server';
 import { Cat } from '@/types';
 import { formatAge, calculateNutritionPlan } from '@/lib/nutrition';
+import { ACTIVITY_LEVELS } from '@/lib/constants';
 import Header from '@/components/layout/Header';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -25,6 +27,15 @@ export default async function CatPage({ params }: CatPageProps) {
     redirect('/auth/login');
   }
 
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+
+  const isAdmin = profile?.is_admin || false;
+
   const { data, error } = await supabase
     .from('cats')
     .select('*')
@@ -38,11 +49,12 @@ export default async function CatPage({ params }: CatPageProps) {
 
   const cat = data as Cat;
   const nutritionPlan = calculateNutritionPlan(cat);
-  const genderEmoji = cat.gender === 'male' ? '♂️' : '♀️';
+  const genderText = cat.gender === 'male' ? 'Male' : 'Female';
+  const activityLabel = ACTIVITY_LEVELS.find(a => a.value === cat.activity_level)?.label || cat.activity_level;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header isLoggedIn />
+      <Header isLoggedIn isAdmin={isAdmin} />
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-center gap-2 text-gray-600 mb-6">
@@ -53,10 +65,23 @@ export default async function CatPage({ params }: CatPageProps) {
           <span className="text-gray-900">{cat.name}</span>
         </div>
 
-        <Card variant="elevated">
+        <Card variant="elevated" className="animate-fade-in-up">
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-4">
-              <div className="text-6xl">🐱</div>
+              <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-orange-200 bg-orange-50 flex-shrink-0">
+                {cat.profile_image_url ? (
+                  <Image
+                    src={cat.profile_image_url}
+                    alt={cat.name}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-5xl">
+                    🐱
+                  </div>
+                )}
+              </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{cat.name}</h1>
                 <p className="text-gray-600">{cat.breed}</p>
@@ -83,14 +108,11 @@ export default async function CatPage({ params }: CatPageProps) {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Gender</dt>
-                  <dd className="font-medium">
-                    {genderEmoji} {cat.gender}{' '}
-                    {cat.is_neutered ? '(Fixed)' : '(Intact)'}
-                  </dd>
+                  <dd className="font-medium">{genderText}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Activity Level</dt>
-                  <dd className="font-medium capitalize">{cat.activity_level}</dd>
+                  <dd className="font-medium">{activityLabel}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Weight Goal</dt>

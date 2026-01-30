@@ -12,15 +12,26 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Check if user is admin (only if logged in)
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+    isAdmin = profile?.is_admin || false;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50">
-      <Header isLoggedIn={!!user} />
+      <Header isLoggedIn={!!user} isAdmin={isAdmin} />
 
       <main>
         {/* Hero Section */}
         <section className="max-w-6xl mx-auto px-4 py-16 md:py-24">
-          <div className="text-center">
-            <div className="text-8xl mb-6">🐱</div>
+          <div className="text-center animate-fade-in">
+            <div className="text-8xl mb-6 animate-scale-in">🐱</div>
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
               Feed Your Cat
               <span className="text-orange-500"> Right</span>
@@ -58,7 +69,7 @@ export default async function HomePage() {
               How MealMeow Works
             </h2>
             <div className="grid md:grid-cols-3 gap-8">
-              <Card variant="bordered" className="text-center">
+              <Card variant="bordered" className="text-center animate-fade-in-up animate-delay-1">
                 <div className="text-5xl mb-4">📝</div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   1. Create Cat Profile
@@ -69,7 +80,7 @@ export default async function HomePage() {
                 </p>
               </Card>
 
-              <Card variant="bordered" className="text-center">
+              <Card variant="bordered" className="text-center animate-fade-in-up animate-delay-2">
                 <div className="text-5xl mb-4">🔬</div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   2. Calculate Nutrition
@@ -80,7 +91,7 @@ export default async function HomePage() {
                 </p>
               </Card>
 
-              <Card variant="bordered" className="text-center">
+              <Card variant="bordered" className="text-center animate-fade-in-up animate-delay-3">
                 <div className="text-5xl mb-4">🍽️</div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   3. Get Recommendations

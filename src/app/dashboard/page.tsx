@@ -20,6 +20,15 @@ export default async function DashboardPage() {
     redirect('/auth/login');
   }
 
+  // Check if user is admin
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+
+  const isAdmin = profile?.is_admin || false;
+
   const { data, error } = await supabase
     .from('cats')
     .select('*')
@@ -30,7 +39,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header isLoggedIn />
+      <Header isLoggedIn isAdmin={isAdmin} />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
@@ -46,13 +55,13 @@ export default async function DashboardPage() {
         </div>
 
         {error && (
-          <Card className="bg-red-50 border border-red-200 mb-6">
+          <Card hover={false} className="bg-red-50 border border-red-200 mb-6">
             <p className="text-red-600">Error loading cats: {error.message}</p>
           </Card>
         )}
 
         {cats.length === 0 && (
-          <Card variant="bordered" className="text-center py-12">
+          <Card variant="bordered" hover={false} className="text-center py-12 animate-fade-in-up">
             <div className="text-6xl mb-4">🐱</div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
               No cats yet!
@@ -67,7 +76,7 @@ export default async function DashboardPage() {
         )}
 
         {cats.length > 0 && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {cats.map((cat) => (
               <CatCard key={cat.id} cat={cat} />
             ))}

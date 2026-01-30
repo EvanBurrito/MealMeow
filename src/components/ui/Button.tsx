@@ -22,7 +22,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+      'inline-flex items-center justify-center font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 ease-out active:scale-[0.98]';
 
     const variants = {
       primary:
@@ -31,8 +31,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500',
       outline:
         'border-2 border-orange-500 text-orange-500 hover:bg-orange-50 focus:ring-orange-500',
-      ghost: 'text-gray-600 hover:bg-gray-100 focus:ring-gray-500',
-      danger: 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500',
+      ghost:
+        'text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:ring-gray-500',
+      danger:
+        'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500',
     };
 
     const sizes = {

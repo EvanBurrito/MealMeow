@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Cat, Gender, ActivityLevel, Goal } from '@/types';
+import { Cat, Gender, ActivityLevel, Goal, HealthCondition } from '@/types';
 import { CAT_BREEDS, ACTIVITY_LEVELS, GOALS } from '@/lib/constants';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Card from '@/components/ui/Card';
+import ImageUpload from '@/components/ui/ImageUpload';
+import HealthConditionsSelect from '@/components/cats/HealthConditionsSelect';
 
 interface CatFormProps {
   cat?: Cat;
@@ -20,6 +22,10 @@ export default function CatForm({ cat, mode }: CatFormProps) {
   const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(
+    cat?.profile_image_url || null
+  );
 
   const [formData, setFormData] = useState({
     name: cat?.name || '',
@@ -31,7 +37,16 @@ export default function CatForm({ cat, mode }: CatFormProps) {
     breed: cat?.breed || 'Domestic Shorthair',
     activity_level: cat?.activity_level || 'normal',
     goal: cat?.goal || 'maintain',
+    health_conditions: cat?.health_conditions || [] as HealthCondition[],
   });
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserId(user.id);
+    };
+    getUser();
+  }, [supabase.auth]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -68,6 +83,8 @@ export default function CatForm({ cat, mode }: CatFormProps) {
         breed: formData.breed,
         activity_level: formData.activity_level as ActivityLevel,
         goal: formData.goal as Goal,
+        health_conditions: formData.health_conditions,
+        profile_image_url: profileImageUrl,
         user_id: user.id,
       };
 
@@ -84,8 +101,13 @@ export default function CatForm({ cat, mode }: CatFormProps) {
 
       router.push('/dashboard');
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+    } catch (err: unknown) {
+      console.error('Error creating cat:', err);
+      if (err && typeof err === 'object' && 'message' in err) {
+        setError(String(err.message));
+      } else {
+        setError('An error occurred');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -97,12 +119,24 @@ export default function CatForm({ cat, mode }: CatFormProps) {
   }));
 
   return (
-    <Card variant="elevated" className="max-w-2xl mx-auto">
+    <Card variant="elevated" className="max-w-2xl mx-auto animate-fade-in">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
         {mode === 'create' ? 'Add New Cat' : 'Edit Cat Profile'}
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Profile Picture Upload */}
+        {userId && (
+          <div className="flex justify-center">
+            <ImageUpload
+              currentImageUrl={profileImageUrl}
+              onImageUploaded={setProfileImageUrl}
+              userId={userId}
+              catId={cat?.id}
+            />
+          </div>
+        )}
+
         <Input
           label="Cat's Name"
           name="name"
@@ -206,6 +240,13 @@ export default function CatForm({ cat, mode }: CatFormProps) {
             options={GOALS.map((g) => ({ value: g.value, label: g.label }))}
           />
         </div>
+
+        <HealthConditionsSelect
+          value={formData.health_conditions}
+          onChange={(conditions) =>
+            setFormData((prev) => ({ ...prev, health_conditions: conditions }))
+          }
+        />
 
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">

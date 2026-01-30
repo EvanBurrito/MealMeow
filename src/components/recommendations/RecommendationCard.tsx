@@ -1,42 +1,86 @@
-import { FoodRecommendation, NutritionPlan } from '@/types';
+'use client';
+
+import { useState } from 'react';
+import { Cat, FoodRecommendation, NutritionPlan, BadgeType, RecommendationFeedback } from '@/types';
+import { trackFoodClick } from '@/lib/analytics';
 import Card from '@/components/ui/Card';
+import FeedbackButton from './FeedbackButton';
+import DownloadButton from './DownloadButton';
+
+const toTitleCase = (str: string) => {
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 interface RecommendationCardProps {
   recommendation: FoodRecommendation;
   nutritionPlan: NutritionPlan;
   rank: number;
+  cat?: Cat;
+  catId?: string;
+  userId?: string;
+  feedback?: RecommendationFeedback | null;
+  onOpenFeedbackModal?: () => void;
+  onCardClick?: () => void;
 }
+
+const badgeConfig: Record<BadgeType, { text: string; color: string; borderColor: string; ringColor: string }> = {
+  best_value: { text: 'Best Value', color: 'bg-orange-500', borderColor: 'border-orange-500', ringColor: 'ring-orange-500' },
+  best_nutrition: { text: 'Best Nutrition', color: 'bg-green-600', borderColor: 'border-green-600', ringColor: 'ring-green-600' },
+  best_match: { text: 'Best Match', color: 'bg-purple-600', borderColor: 'border-purple-600', ringColor: 'ring-purple-600' },
+  budget_pick: { text: 'Budget Pick', color: 'bg-blue-500', borderColor: 'border-blue-500', ringColor: 'ring-blue-500' },
+};
 
 export default function RecommendationCard({
   recommendation,
   nutritionPlan,
   rank,
+  cat,
+  catId,
+  userId,
+  feedback,
+  onOpenFeedbackModal,
+  onCardClick,
 }: RecommendationCardProps) {
-  const { food, dailyAmount, amountUnit, amountPerMeal, dailyCost, monthlyCost } =
+  const [showScoreDetails, setShowScoreDetails] = useState(false);
+  const { food, dailyAmount, amountUnit, amountPerMeal, dailyCost, monthlyCost, score, badges } =
     recommendation;
 
-  const isTopPick = rank === 1;
+  const primaryBadge = badges.length > 0 ? badges[0] : null;
+  const badgeInfo = primaryBadge ? badgeConfig[primaryBadge] : null;
+  const hasBadge = !!badgeInfo;
+
+  const handleCardClick = async () => {
+    if (userId && catId) {
+      await trackFoodClick(userId, catId, food.id, rank, score.overall);
+    }
+    onCardClick?.();
+  };
 
   return (
     <Card
-      variant="bordered"
-      className={`relative ${isTopPick ? 'border-orange-500 border-2' : ''}`}
+      variant="default"
+      hover={false}
+      className={`relative shadow-sm transition-all duration-150 hover:shadow-md active:scale-[0.98] ${hasBadge ? `ring-2 ${badgeInfo?.ringColor}` : 'ring-1 ring-orange-200'} ${onCardClick ? 'cursor-pointer' : ''}`}
+      onClick={onCardClick ? handleCardClick : undefined}
     >
-      {isTopPick && (
-        <div className="absolute -top-3 left-4 bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-          Best Value
+      {badgeInfo && (
+        <div className={`absolute -top-3 left-4 ${badgeInfo.color} text-white px-3 py-1 rounded-full text-sm font-medium`}>
+          {badgeInfo.text}
         </div>
       )}
 
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between gap-2 mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-gray-900 leading-tight">
             {food.product_name}
           </h3>
-          <p className="text-gray-600">{food.brand}</p>
+          <p className="text-gray-600 text-sm">{food.brand}</p>
+          {food.flavour && (
+            <p className="text-gray-500 text-xs">{food.flavour}</p>
+          )}
         </div>
         <span
-          className={`px-2 py-1 rounded text-sm font-medium ${
+          className={`px-2 py-1 rounded text-sm font-medium flex-shrink-0 ${
             food.food_type === 'dry'
               ? 'bg-amber-100 text-amber-700'
               : 'bg-blue-100 text-blue-700'
@@ -97,6 +141,77 @@ export default function RecommendationCard({
         </div>
       </div>
 
+      {/* Score Section */}
+      <div className="pt-3 border-t border-gray-100">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowScoreDetails(!showScoreDetails);
+          }}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700">Score</span>
+            <div className="flex items-center gap-1">
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-orange-400 to-orange-600"
+                style={{ width: `${score.overall}px` }}
+              />
+              <span className="text-lg font-bold text-orange-600">{score.overall}</span>
+            </div>
+          </div>
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${showScoreDetails ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {showScoreDetails && (
+          <div className="mt-3 space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">Nutrition</span>
+              <div className="flex items-center gap-2">
+                <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full"
+                    style={{ width: `${score.nutritionScore}%` }}
+                  />
+                </div>
+                <span className="font-medium text-gray-700 w-8 text-right">{score.nutritionScore}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">Value</span>
+              <div className="flex items-center gap-2">
+                <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-orange-500 rounded-full"
+                    style={{ width: `${score.valueScore}%` }}
+                  />
+                </div>
+                <span className="font-medium text-gray-700 w-8 text-right">{score.valueScore}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500">Suitability</span>
+              <div className="flex items-center gap-2">
+                <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full"
+                    style={{ width: `${score.suitabilityScore}%` }}
+                  />
+                </div>
+                <span className="font-medium text-gray-700 w-8 text-right">{score.suitabilityScore}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {food.special_benefits && food.special_benefits.length > 0 && (
         <div className="pt-3 mt-3 border-t border-gray-100">
           <div className="flex flex-wrap gap-2">
@@ -105,12 +220,28 @@ export default function RecommendationCard({
                 key={benefit}
                 className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium"
               >
-                {benefit}
+                {toTitleCase(benefit)}
               </span>
             ))}
           </div>
         </div>
       )}
+
+      {/* Action Buttons - Always visible at bottom */}
+      <div className="pt-3 mt-3 border-t border-gray-100 flex justify-end gap-2">
+        {cat && (
+          <DownloadButton
+            cat={cat}
+            nutritionPlan={nutritionPlan}
+            recommendation={recommendation}
+          />
+        )}
+        <FeedbackButton
+          existingFeedback={feedback}
+          onOpenFeedback={onOpenFeedbackModal || (() => {})}
+          disabled={!userId || !catId || !onOpenFeedbackModal}
+        />
+      </div>
     </Card>
   );
 }

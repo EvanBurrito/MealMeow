@@ -2,20 +2,25 @@ import { HTMLAttributes, forwardRef } from 'react';
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'bordered' | 'elevated';
+  hover?: boolean;
 }
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className = '', variant = 'default', children, ...props }, ref) => {
+  ({ className = '', variant = 'default', hover = false, children, ...props }, ref) => {
+    const baseStyles = 'bg-white rounded-xl p-6';
+
     const variants = {
-      default: 'bg-white rounded-xl p-6',
-      bordered: 'bg-white rounded-xl p-6 border border-gray-200',
-      elevated: 'bg-white rounded-xl p-6 shadow-lg',
+      default: '',
+      bordered: 'border border-gray-200',
+      elevated: 'shadow-lg',
     };
+
+    const hoverStyles = '';
 
     return (
       <div
         ref={ref}
-        className={`${variants[variant]} ${className}`}
+        className={`${baseStyles} ${variants[variant]} ${hoverStyles} ${className}`}
         {...props}
       >
         {children}

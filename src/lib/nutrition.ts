@@ -1,4 +1,6 @@
-import { Cat, CatFood, NutritionPlan, FoodRecommendation } from '@/types';
+import { Cat, CatFood, NutritionPlan, FoodRecommendation, HealthCondition } from '@/types';
+import { HEALTH_CONDITION_REQUIREMENTS } from './constants';
+import { calculateRecommendationScore, determineBadges } from './scoring';
 
 // Life stage factors for DER calculation
 const LIFE_STAGE_FACTORS = {
@@ -95,11 +97,19 @@ export function calculateNutritionPlan(cat: Cat): NutritionPlan {
 }
 
 /**
+ * Calculate total kcal in a food package
+ */
+export function getTotalKcalPerUnit(food: CatFood): number {
+  const { kcal } = getKcalPerUnit(food);
+  return kcal * food.servings_per_unit;
+}
+
+/**
  * Calculate cost per 100 kcal
  */
-export function calculateCostPer100kcal(price: number, kcal: number): number {
-  if (kcal === 0) return Infinity;
-  return (price / kcal) * 100;
+export function calculateCostPer100kcal(price: number, totalKcal: number): number {
+  if (totalKcal === 0) return Infinity;
+  return (price / totalKcal) * 100;
 }
 
 /**
@@ -149,6 +159,67 @@ export function isLifeStageAppropriate(food: CatFood, cat: Cat): boolean {
 }
 
 /**
+ * Check if a food is compatible with the cat's health conditions
+ * Returns compatibility info with score and matched benefits
+ */
+export function isHealthConditionCompatible(
+  food: CatFood,
+  conditions: HealthCondition[]
+): { compatible: boolean; matchedBenefits: string[]; score: number } {
+  if (conditions.length === 0) {
+    return { compatible: true, matchedBenefits: [], score: 1 };
+  }
+
+  let score = 1;
+  const matchedBenefits: string[] = [];
+
+  for (const condition of conditions) {
+    const requirements = HEALTH_CONDITION_REQUIREMENTS[condition];
+    if (!requirements) continue;
+
+    // Check required benefits
+    let hasRequiredBenefit = requirements.requiredBenefits.length === 0;
+    for (const benefit of requirements.requiredBenefits) {
+      if (food.special_benefits.includes(benefit)) {
+        matchedBenefits.push(benefit);
+        hasRequiredBenefit = true;
+        score += 0.2;
+      }
+    }
+
+    // If required benefits are specified but none found, heavily penalize
+    if (requirements.requiredBenefits.length > 0 && !hasRequiredBenefit) {
+      score -= 0.5;
+    }
+
+    // Check preferred benefits (bonus)
+    for (const benefit of requirements.preferredBenefits) {
+      if (food.special_benefits.includes(benefit)) {
+        matchedBenefits.push(benefit);
+        score += 0.1;
+      }
+    }
+
+    // Check nutritional constraints
+    if (requirements.maxFatPct && food.fat_pct > requirements.maxFatPct) {
+      score -= 0.3;
+    }
+    if (requirements.minProteinPct && food.protein_pct < requirements.minProteinPct) {
+      score -= 0.3;
+    }
+    if (requirements.maxFiberPct && food.fiber_pct > requirements.maxFiberPct) {
+      score -= 0.2;
+    }
+  }
+
+  return {
+    compatible: score > 0.3,
+    matchedBenefits: [...new Set(matchedBenefits)],
+    score: Math.max(0, score),
+  };
+}
+
+/**
  * Generate food recommendations for a cat
  */
 export function generateRecommendations(
@@ -157,12 +228,27 @@ export function generateRecommendations(
   options: {
     foodTypePreference?: 'dry' | 'wet' | 'any';
     maxMonthlyBudget?: number;
+    healthConditions?: HealthCondition[];
   } = {}
 ): FoodRecommendation[] {
-  const { foodTypePreference = 'any', maxMonthlyBudget } = options;
+  const {
+    foodTypePreference = 'any',
+    maxMonthlyBudget,
+    healthConditions = cat.health_conditions || [],
+  } = options;
   const nutritionPlan = calculateNutritionPlan(cat);
 
-  const recommendations: FoodRecommendation[] = [];
+  // First pass: collect all valid foods and their cost data
+  const validFoods: Array<{
+    food: CatFood;
+    kcal: number;
+    unit: string;
+    costPer100kcal: number;
+    dailyAmount: number;
+    amountPerMeal: number;
+    dailyCost: number;
+    monthlyCost: number;
+  }> = [];
 
   for (const food of foods) {
     // Filter by food type preference
@@ -180,12 +266,19 @@ export function generateRecommendations(
       continue;
     }
 
+    // Filter by health condition compatibility
+    const healthCheck = isHealthConditionCompatible(food, healthConditions);
+    if (!healthCheck.compatible) {
+      continue;
+    }
+
     const { kcal, unit } = getKcalPerUnit(food);
     if (kcal === 0) continue;
 
     const dailyAmount = nutritionPlan.der / kcal;
     const amountPerMeal = dailyAmount / nutritionPlan.mealsPerDay;
-    const costPer100kcal = calculateCostPer100kcal(food.price_per_unit, kcal);
+    const totalKcalPerUnit = getTotalKcalPerUnit(food);
+    const costPer100kcal = calculateCostPer100kcal(food.price_per_unit, totalKcalPerUnit);
     const dailyCost = calculateDailyCost(nutritionPlan.der, costPer100kcal);
     const monthlyCost = calculateMonthlyCost(dailyCost);
 
@@ -194,19 +287,52 @@ export function generateRecommendations(
       continue;
     }
 
-    recommendations.push({
+    validFoods.push({
       food,
-      dailyAmount: Math.round(dailyAmount * 100) / 100,
-      amountUnit: unit,
-      amountPerMeal: Math.round(amountPerMeal * 100) / 100,
-      dailyCost: Math.round(dailyCost * 100) / 100,
-      monthlyCost: Math.round(monthlyCost * 100) / 100,
-      costPer100kcal: Math.round(costPer100kcal * 100) / 100,
+      kcal,
+      unit,
+      costPer100kcal,
+      dailyAmount,
+      amountPerMeal,
+      dailyCost,
+      monthlyCost,
     });
   }
 
-  // Sort by cost efficiency (lowest cost per 100kcal first)
-  recommendations.sort((a, b) => a.costPer100kcal - b.costPer100kcal);
+  // Collect all costs for value score calculation
+  const allCostsPer100kcal = validFoods.map((f) => f.costPer100kcal);
+
+  // Second pass: create recommendations with scores
+  const recommendations: FoodRecommendation[] = validFoods.map((item) => {
+    const score = calculateRecommendationScore(
+      item.food,
+      cat,
+      item.costPer100kcal,
+      allCostsPer100kcal,
+      healthConditions
+    );
+
+    return {
+      food: item.food,
+      dailyAmount: Math.round(item.dailyAmount * 100) / 100,
+      amountUnit: item.unit,
+      amountPerMeal: Math.round(item.amountPerMeal * 100) / 100,
+      dailyCost: Math.round(item.dailyCost * 100) / 100,
+      monthlyCost: Math.round(item.monthlyCost * 100) / 100,
+      costPer100kcal: Math.round(item.costPer100kcal * 100) / 100,
+      score,
+      badges: [],
+    };
+  });
+
+  // Sort by overall score (highest first)
+  recommendations.sort((a, b) => b.score.overall - a.score.overall);
+
+  // Determine badges
+  const badgeMap = determineBadges(recommendations);
+  for (const rec of recommendations) {
+    rec.badges = badgeMap.get(rec.food.id) || [];
+  }
 
   return recommendations;
 }

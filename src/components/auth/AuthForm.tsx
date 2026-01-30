@@ -12,17 +12,44 @@ interface AuthFormProps {
   mode: 'login' | 'signup';
 }
 
+function validatePassword(password: string): string | null {
+  if (password.length < 8) {
+    return 'Password must be at least 8 characters long';
+  }
+  if (!/[A-Z]/.test(password)) {
+    return 'Password must contain at least one uppercase letter';
+  }
+  if (!/[0-9]/.test(password)) {
+    return 'Password must contain at least one number';
+  }
+  return null;
+}
+
 export default function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (mode === 'signup') {
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        setError(passwordError);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
@@ -76,16 +103,47 @@ export default function AuthForm({ mode }: AuthFormProps) {
           required
         />
 
-        <Input
-          type="password"
-          label="Password"
-          name="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          minLength={6}
-          required
-        />
+        <div>
+          <Input
+            type="password"
+            label="Password"
+            name="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            minLength={mode === 'signup' ? 8 : 6}
+            required
+          />
+          {mode === 'signup' && (
+            <p className="text-xs text-gray-500 mt-1">
+              Must be at least 8 characters with 1 uppercase letter and 1 number
+            </p>
+          )}
+        </div>
+
+        {mode === 'signup' && (
+          <Input
+            type="password"
+            label="Confirm Password"
+            name="confirmPassword"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="••••••••"
+            minLength={8}
+            required
+          />
+        )}
+
+        {mode === 'login' && (
+          <div className="text-right">
+            <Link
+              href="/auth/forgot-password"
+              className="text-sm text-orange-500 hover:text-orange-600"
+            >
+              Forgot password?
+            </Link>
+          </div>
+        )}
 
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
