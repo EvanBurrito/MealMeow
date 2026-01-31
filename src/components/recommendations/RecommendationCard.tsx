@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Cat, FoodRecommendation, NutritionPlan, BadgeType, RecommendationFeedback } from '@/types';
+import { Cat, FoodRecommendation, NutritionPlan, BadgeType } from '@/types';
 import { trackFoodClick } from '@/lib/analytics';
 import Card from '@/components/ui/Card';
-import FeedbackButton from './FeedbackButton';
-import DownloadButton from './DownloadButton';
+import Button from '@/components/ui/Button';
+import SafeImagePreview from '@/components/ui/SafeImagePreview';
 
 const toTitleCase = (str: string) => {
   return str.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -18,9 +18,9 @@ interface RecommendationCardProps {
   cat?: Cat;
   catId?: string;
   userId?: string;
-  feedback?: RecommendationFeedback | null;
-  onOpenFeedbackModal?: () => void;
+  mealsPerDay?: number;
   onCardClick?: () => void;
+  onSelectPlan?: () => void;
 }
 
 const badgeConfig: Record<BadgeType, { text: string; color: string; borderColor: string; ringColor: string }> = {
@@ -37,13 +37,17 @@ export default function RecommendationCard({
   cat,
   catId,
   userId,
-  feedback,
-  onOpenFeedbackModal,
+  mealsPerDay: mealsPerDayProp,
   onCardClick,
+  onSelectPlan,
 }: RecommendationCardProps) {
   const [showScoreDetails, setShowScoreDetails] = useState(false);
-  const { food, dailyAmount, amountUnit, amountPerMeal, dailyCost, monthlyCost, score, badges } =
+  const { food, dailyAmount, amountUnit, dailyCost, monthlyCost, score, badges } =
     recommendation;
+
+  // Use provided mealsPerDay or fall back to nutritionPlan
+  const mealsPerDay = mealsPerDayProp ?? nutritionPlan.mealsPerDay;
+  const amountPerMeal = Math.round((dailyAmount / mealsPerDay) * 100) / 100;
 
   const primaryBadge = badges.length > 0 ? badges[0] : null;
   const badgeInfo = primaryBadge ? badgeConfig[primaryBadge] : null;
@@ -69,28 +73,40 @@ export default function RecommendationCard({
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-2 mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 leading-tight">
-            {food.product_name}
-          </h3>
-          <p className="text-gray-600 text-sm">{food.brand}</p>
-          {food.flavour && (
-            <p className="text-gray-500 text-xs">{food.flavour}</p>
-          )}
+      <div className="flex items-start gap-3 mb-4">
+        <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+          <SafeImagePreview
+            src={food.image_url || ''}
+            alt={food.product_name}
+            fill
+            className="object-contain p-1.5"
+          />
         </div>
-        <span
-          className={`px-2 py-1 rounded text-sm font-medium flex-shrink-0 ${
-            food.food_type === 'dry'
-              ? 'bg-amber-100 text-amber-700'
-              : 'bg-blue-100 text-blue-700'
-          }`}
-        >
-          {food.food_type === 'dry' ? 'Dry' : 'Wet'}
-        </span>
+        <div className="flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                {food.product_name}
+              </h3>
+              <p className="text-gray-600 text-sm">{food.brand}</p>
+              {food.flavour && (
+                <p className="text-gray-500 text-xs">{food.flavour}</p>
+              )}
+            </div>
+            <span
+              className={`px-2 py-1 rounded text-sm font-medium flex-shrink-0 ${
+                food.food_type === 'dry'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}
+            >
+              {food.food_type === 'dry' ? 'Dry' : 'Wet'}
+            </span>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-2 gap-4 mb-3">
         <div className="bg-gray-50 rounded-lg p-3">
           <p className="text-sm text-gray-500">Daily Amount</p>
           <p className="text-lg font-semibold text-gray-900">
@@ -103,12 +119,12 @@ export default function RecommendationCard({
             {amountPerMeal} {amountUnit}(s)
           </p>
           <p className="text-xs text-gray-500">
-            {nutritionPlan.mealsPerDay}x daily
+            {mealsPerDay}x daily
           </p>
         </div>
       </div>
 
-      <div className="flex items-center justify-between py-3 border-t border-gray-100">
+      <div className="flex items-center justify-between py-2 border-t border-gray-100">
         <div>
           <p className="text-sm text-gray-500">Estimated Cost</p>
           <p className="text-xl font-bold text-orange-600">
@@ -123,8 +139,8 @@ export default function RecommendationCard({
         </div>
       </div>
 
-      <div className="pt-3 border-t border-gray-100">
-        <p className="text-sm font-medium text-gray-700 mb-2">Nutrition</p>
+      <div className="pt-2 border-t border-gray-100">
+        <p className="text-sm font-medium text-gray-700 mb-1">Nutrition</p>
         <div className="flex gap-4 text-sm">
           <div>
             <span className="text-gray-500">Protein: </span>
@@ -142,7 +158,7 @@ export default function RecommendationCard({
       </div>
 
       {/* Score Section */}
-      <div className="pt-3 border-t border-gray-100">
+      <div className="pt-2 mt-2 border-t border-gray-100">
         <button
           type="button"
           onClick={(e) => {
@@ -171,7 +187,7 @@ export default function RecommendationCard({
           </svg>
         </button>
         {showScoreDetails && (
-          <div className="mt-3 space-y-2 text-sm">
+          <div className="mt-2 space-y-1.5 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Nutrition</span>
               <div className="flex items-center gap-2">
@@ -213,8 +229,8 @@ export default function RecommendationCard({
       </div>
 
       {food.special_benefits && food.special_benefits.length > 0 && (
-        <div className="pt-3 mt-3 border-t border-gray-100">
-          <div className="flex flex-wrap gap-2">
+        <div className="pt-2 mt-2 border-t border-gray-100">
+          <div className="flex flex-wrap gap-1.5">
             {food.special_benefits.map((benefit) => (
               <span
                 key={benefit}
@@ -228,20 +244,20 @@ export default function RecommendationCard({
       )}
 
       {/* Action Buttons - Always visible at bottom */}
-      <div className="pt-3 mt-3 border-t border-gray-100 flex justify-end gap-2">
-        {cat && (
-          <DownloadButton
-            cat={cat}
-            nutritionPlan={nutritionPlan}
-            recommendation={recommendation}
-          />
-        )}
-        <FeedbackButton
-          existingFeedback={feedback}
-          onOpenFeedback={onOpenFeedbackModal || (() => {})}
-          disabled={!userId || !catId || !onOpenFeedbackModal}
-        />
-      </div>
+      {cat && onSelectPlan && (
+        <div className="pt-2 mt-2 border-t border-gray-100">
+          <Button
+            size="sm"
+            className="w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectPlan();
+            }}
+          >
+            Select
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

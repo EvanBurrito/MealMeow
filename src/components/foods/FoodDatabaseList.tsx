@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback } from 'react';
-import { CatFood, FoodType, LifeStage } from '@/types';
+import { Cat, CatFood, FoodType, LifeStage } from '@/types';
 import FoodCard from './FoodCard';
 import FoodDatabaseFilters from './FoodDatabaseFilters';
 import SimpleFoodDetailModal from './SimpleFoodDetailModal';
@@ -9,9 +9,11 @@ import Card from '@/components/ui/Card';
 
 interface FoodDatabaseListProps {
   foods: CatFood[];
+  userId?: string;
+  cats?: Cat[];
 }
 
-export default function FoodDatabaseList({ foods }: FoodDatabaseListProps) {
+export default function FoodDatabaseList({ foods, userId, cats }: FoodDatabaseListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [foodType, setFoodType] = useState<FoodType | 'all'>('all');
   const [lifeStage, setLifeStage] = useState<LifeStage | 'all'>('all');
@@ -116,6 +118,7 @@ export default function FoodDatabaseList({ foods }: FoodDatabaseListProps) {
                 <FoodCard
                   food={food}
                   onClick={() => setSelectedFood(food)}
+                  searchQuery={searchQuery}
                 />
               </div>
             ))}
@@ -128,6 +131,8 @@ export default function FoodDatabaseList({ foods }: FoodDatabaseListProps) {
           isOpen={!!selectedFood}
           food={selectedFood}
           onClose={() => setSelectedFood(null)}
+          userId={userId}
+          cats={cats}
         />
       )}
     </>

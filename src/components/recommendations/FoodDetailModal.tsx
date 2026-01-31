@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { CatFood, NutritionPlan } from '@/types';
 import Button from '@/components/ui/Button';
@@ -10,16 +11,24 @@ const toTitleCase = (str: string) => {
 };
 
 interface FoodDetailModalProps {
-  food: CatFood;
+  isOpen: boolean;
+  food: CatFood | null;
   nutritionPlan: NutritionPlan;
   dailyAmount: number;
   amountUnit: string;
   dailyCost: number;
   monthlyCost: number;
   onClose: () => void;
+  onAdd?: () => void;
+  onDecrement?: () => void;
+  onSelect?: () => void; // Legacy prop for recommendations page
+  isSelected?: boolean;
+  mealCount?: number;
+  isMaxSelected?: boolean;
 }
 
 export default function FoodDetailModal({
+  isOpen,
   food,
   nutritionPlan,
   dailyAmount,
@@ -27,24 +36,47 @@ export default function FoodDetailModal({
   dailyCost,
   monthlyCost,
   onClose,
+  onAdd,
+  onDecrement,
+  onSelect, // Legacy prop
+  isSelected,
+  mealCount = 0,
+  isMaxSelected,
 }: FoodDetailModalProps) {
+  // Use onAdd if provided, otherwise fall back to onSelect for backward compatibility
+  const handleAdd = onAdd || onSelect;
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const amountPerMeal = Math.round((dailyAmount / nutritionPlan.mealsPerDay) * 100) / 100;
+
+  // Check if we're on the client
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // Trigger enter animation after mount
   useEffect(() => {
-    requestAnimationFrame(() => setIsVisible(true));
-  }, []);
+    if (isOpen && isClient) {
+      const raf = requestAnimationFrame(() => setIsVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [isOpen, isClient]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
+      setIsClosing(false);
+      setIsVisible(false);
       onClose();
     }, 200);
-  };
+  }, [onClose]);
 
-  return (
+  if (!isOpen || !food || !isClient) return null;
+
+  const amountPerMeal = Math.round((dailyAmount / nutritionPlan.mealsPerDay) * 100) / 100;
+
+  const modalContent = (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${
         isVisible && !isClosing ? 'opacity-100' : 'opacity-0'
@@ -56,7 +88,7 @@ export default function FoodDetailModal({
         aria-hidden="true"
       />
       <div
-        className={`relative bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border-2 border-orange-300 transition-all duration-200 ${
+        className={`relative z-10 bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border-2 border-orange-300 transition-all duration-200 ${
           isVisible && !isClosing ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
         }`}
         role="dialog"
@@ -204,40 +236,101 @@ export default function FoodDetailModal({
             </div>
           )}
 
-          {/* Buy Now Button */}
-          <div className="flex gap-2 pt-3 border-t border-gray-100">
-            {food.purchase_url ? (
-              <a
-                href={food.purchase_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1"
-              >
-                <Button className="w-full">
-                  <span className="flex items-center justify-center gap-2">
-                    Buy Now
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                      />
-                    </svg>
-                  </span>
-                </Button>
-              </a>
-            ) : (
-              <Button disabled className="flex-1 opacity-50 cursor-not-allowed">
-                Purchase Link Not Available
-              </Button>
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 pt-3 border-t border-gray-100">
+            {/* Add/Remove buttons */}
+            {(handleAdd || onDecrement) && (
+              <div className="flex gap-2">
+                {handleAdd && (
+                  <Button
+                    onClick={() => {
+                      handleAdd();
+                      // Don't close modal when adding in Build Your Own mode (onAdd provided)
+                      // Close when using legacy onSelect behavior
+                      if (onSelect && !onAdd) {
+                        handleClose();
+                      }
+                    }}
+                    disabled={isMaxSelected}
+                    className="flex-1"
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      {onAdd ? (isSelected ? 'Add another meal' : 'Add to meal plan') : 'Select'}
+                    </span>
+                  </Button>
+                )}
+                {isSelected && onDecrement && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onDecrement();
+                      // Close modal only if this will remove the food entirely
+                      if (mealCount <= 1) {
+                        handleClose();
+                      }
+                    }}
+                    className={`flex-1 ${mealCount <= 1 ? 'border-red-300 text-red-600 hover:bg-red-50' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                      </svg>
+                      Remove
+                    </span>
+                  </Button>
+                )}
+              </div>
             )}
-            <Button variant="outline" onClick={handleClose}>
-              Close
-            </Button>
+
+            {/* Selection status */}
+            {isSelected && mealCount > 0 && (
+              <div className="bg-emerald-50 rounded-lg px-3 py-2 text-center">
+                <span className="text-emerald-700 font-medium">
+                  Currently in plan: × {mealCount} meal{mealCount > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+
+            {/* Purchase and Close buttons */}
+            <div className="flex gap-2">
+              {food.purchase_url ? (
+                <a
+                  href={food.purchase_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1"
+                >
+                  <Button variant="outline" className="w-full">
+                    <span className="flex items-center justify-center gap-2">
+                      Buy Now
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                        />
+                      </svg>
+                    </span>
+                  </Button>
+                </a>
+              ) : (
+                <Button disabled variant="outline" className="flex-1 opacity-50 cursor-not-allowed">
+                  Purchase Link Not Available
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleClose}>
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

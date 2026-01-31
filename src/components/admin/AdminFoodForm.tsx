@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { FoodType, LifeStage, CatFood, UserSubmittedFood } from '@/types';
 import { SPECIAL_BENEFITS } from '@/lib/constants';
@@ -10,6 +9,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Card from '@/components/ui/Card';
+import SafeImagePreview from '@/components/ui/SafeImagePreview';
 
 interface AdminFoodFormProps {
   mode: 'add' | 'edit-food' | 'edit-submission';
@@ -247,21 +247,19 @@ export default function AdminFoodForm({
           : 'Edit the food information below.'}
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         {/* Image Upload Section */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Product Image</h3>
           <div className="flex items-start gap-4">
-            {formData.image_url && (
-              <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                <Image
-                  src={formData.image_url}
-                  alt="Product"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            )}
+            <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+              <SafeImagePreview
+                src={formData.image_url}
+                alt="Product"
+                fill
+                className="object-cover"
+              />
+            </div>
             <div className="flex-1 space-y-2">
               <Input
                 label="Image URL"

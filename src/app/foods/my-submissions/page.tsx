@@ -9,6 +9,7 @@ import Header from '@/components/layout/Header';
 import SubmissionCard from '@/components/foods/SubmissionCard';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function MySubmissionsPage() {
   const router = useRouter();
@@ -16,6 +17,11 @@ export default function MySubmissionsPage() {
   const [submissions, setSubmissions] = useState<UserSubmittedFood[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({ isOpen: false, id: null });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function loadSubmissions() {
@@ -49,19 +55,25 @@ export default function MySubmissionsPage() {
     loadSubmissions();
   }, [router, supabase]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this submission?')) {
-      return;
-    }
+  const handleDelete = (id: string) => {
+    setDeleteDialog({ isOpen: true, id });
+  };
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialog.id) return;
+
+    setIsDeleting(true);
     try {
-      const { error } = await supabase.from('user_submitted_foods').delete().eq('id', id);
+      const { error } = await supabase.from('user_submitted_foods').delete().eq('id', deleteDialog.id);
       if (error) throw error;
 
-      setSubmissions((prev) => prev.filter((s) => s.id !== id));
+      setSubmissions((prev) => prev.filter((s) => s.id !== deleteDialog.id));
+      setDeleteDialog({ isOpen: false, id: null });
     } catch (err) {
       console.error('Error deleting submission:', err);
-      alert('Failed to delete submission');
+      setError('Failed to delete submission');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -137,6 +149,18 @@ export default function MySubmissionsPage() {
           </div>
         )}
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, id: null })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Submission"
+        message="Are you sure you want to delete this submission? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

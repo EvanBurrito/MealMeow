@@ -8,9 +8,11 @@ interface RecommendationFiltersProps {
   foodType: string;
   budget: string;
   healthConditions: HealthCondition[];
+  mealsPerDay?: number;
   onFoodTypeChange: (value: string) => void;
   onBudgetChange: (value: string) => void;
   onHealthConditionsChange: (conditions: HealthCondition[]) => void;
+  onMealsPerDayChange?: (value: number) => void;
 }
 
 const FOOD_TYPE_OPTIONS = [
@@ -23,9 +25,11 @@ export default function RecommendationFilters({
   foodType,
   budget,
   healthConditions,
+  mealsPerDay = 2,
   onFoodTypeChange,
   onBudgetChange,
   onHealthConditionsChange,
+  onMealsPerDayChange,
 }: RecommendationFiltersProps) {
   const handleToggleCondition = (condition: HealthCondition) => {
     if (healthConditions.includes(condition)) {
@@ -70,6 +74,29 @@ export default function RecommendationFilters({
             step="10"
           />
         </div>
+        {onMealsPerDayChange && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Meals/Day
+            </label>
+            <div className="flex rounded-lg overflow-hidden border border-gray-300">
+              {[1, 2, 3, 4].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => onMealsPerDayChange(num)}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    mealsPerDay === num
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  } ${num > 1 ? 'border-l border-gray-300' : ''}`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       {healthConditions.length > 0 && (
         <div>

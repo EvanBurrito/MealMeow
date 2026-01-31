@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { CatFood } from '@/types';
+import { Cat, CatFood } from '@/types';
 import Header from '@/components/layout/Header';
 import FoodDatabaseList from '@/components/foods/FoodDatabaseList';
 import Button from '@/components/ui/Button';
@@ -25,6 +25,13 @@ export default async function DatabasePage() {
     .single();
 
   const isAdmin = profile?.is_admin || false;
+
+  // Load user's cats for feedback
+  const { data: cats } = await supabase
+    .from('cats')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('name', { ascending: true });
 
   const { data: foods } = await supabase
     .from('cat_foods')
@@ -52,7 +59,11 @@ export default async function DatabasePage() {
           </Link>
         </div>
 
-        <FoodDatabaseList foods={(foods as CatFood[]) || []} />
+        <FoodDatabaseList
+          foods={(foods as CatFood[]) || []}
+          userId={user.id}
+          cats={(cats as Cat[]) || []}
+        />
       </main>
     </div>
   );

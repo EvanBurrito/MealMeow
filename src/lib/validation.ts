@@ -1,5 +1,46 @@
 import { FoodSubmissionForm, FoodType } from '@/types';
 
+/**
+ * Check if a string is a valid URL
+ */
+export function isValidImageUrl(url: string): boolean {
+  if (!url || !url.trim()) return false;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a URL is in the Next.js image whitelist
+ * (Supabase storage or Chewy images)
+ */
+export function isWhitelistedImageUrl(url: string): boolean {
+  if (!isValidImageUrl(url)) return false;
+
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+
+    // Check for Supabase storage URLs
+    if (hostname.endsWith('.supabase.co') && parsed.pathname.startsWith('/storage/v1/object/public/')) {
+      return true;
+    }
+
+    // Check for Chewy images
+    if (hostname === 'image.chewy.com') {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors: Record<string, string>;

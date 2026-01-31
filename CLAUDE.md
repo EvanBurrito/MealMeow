@@ -19,7 +19,7 @@ npm start        # Start production server
 
 **Routing:** Next.js App Router with Server Components by default. Client Components marked with `'use client'`.
 
-**Auth Flow:** Supabase Auth with cookie-based sessions. `middleware.ts` protects routes and handles redirects. Protected routes: `/dashboard/*`, `/cats/*`, `/admin/*`.
+**Auth Flow:** Supabase Auth with cookie-based sessions. `middleware.ts` protects routes and handles redirects. Protected routes: `/dashboard/*`, `/cats/*`, `/admin/*`, `/saved-plans/*`.
 
 **Database Access:**
 - Server Components: `import { createClient } from '@/lib/supabase/server'`
@@ -39,6 +39,12 @@ npm start        # Start production server
 **Nutrition Formulas** (`src/lib/nutrition.ts`):
 - RER = 70 × (weight_kg)^0.75
 - DER = RER × life_stage_factor (kitten: 2.5, adult neutered: 1.2, weight loss: 0.8)
+- `calculateSimpleDER(weightLbs, ageMonths)` - Simplified DER calculation without full cat profile
+
+**Meal Planning** (`src/lib/mealPlanner.ts`):
+- `generateMealPlanSummaryWithMealCount()` - Calculate portions for multi-food meal plans
+- `roundToPracticalPortion()` - Round to practical serving sizes (0.25 cups, 0.5 cans)
+- `calculateDailyCostForAmountExported()` - Cost calculations for meal plans
 
 **Food Scoring** (`src/lib/scoring.ts`):
 - Weights: Nutrition 35%, Value 30%, Suitability 35%
@@ -56,10 +62,30 @@ npm start        # Start production server
 - `recommendation_feedback` - User ratings on foods
 - `analytics_events` - Usage tracking
 - `user_submitted_foods` - Community food submissions (admin approval workflow)
+- `saved_meal_plans` - User-created meal plans without cat profiles (JSONB food_selections)
 
 ## Admin System
 
 Admin users determined by `profiles.is_admin = true`. Admin routes at `/admin/*` check this flag and redirect non-admins to dashboard. The `is_admin()` SQL function (SECURITY DEFINER) is used to avoid RLS recursion.
+
+## Saved Plans Feature
+
+Allows users to create meal plans without a full cat profile. Located at `/saved-plans/*`.
+
+**Components** (`src/components/saved-plans/`):
+- `CreatePlanModal` - Setup modal with calorie input (direct or calculated from weight/age)
+- `StandaloneMealBuilder` - Food selection grid adapted from BuildOwnPlanView
+- `StandaloneMealSidebar` - Plan summary with save action
+
+**Dashboard Components** (`src/components/dashboard/`):
+- `SavedPlansSection` - Container with plan list and create button
+- `SavedPlanCard` - Display card for saved plans with edit/delete actions
+
+**Data Flow**:
+1. User enters plan name + target calories (direct or via weight/age calculation)
+2. Navigate to `/saved-plans/new` with params
+3. Select foods and assign meal counts
+4. Save to `saved_meal_plans` table with user_id
 
 ## Environment Variables
 

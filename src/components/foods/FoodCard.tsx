@@ -2,6 +2,8 @@
 
 import { CatFood } from '@/types';
 import Card from '@/components/ui/Card';
+import SafeImagePreview from '@/components/ui/SafeImagePreview';
+import HighlightedText from '@/components/ui/HighlightedText';
 
 const toTitleCase = (str: string) => {
   return str.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -10,9 +12,10 @@ const toTitleCase = (str: string) => {
 interface FoodCardProps {
   food: CatFood;
   onClick?: () => void;
+  searchQuery?: string;
 }
 
-export default function FoodCard({ food, onClick }: FoodCardProps) {
+export default function FoodCard({ food, onClick, searchQuery = '' }: FoodCardProps) {
   return (
     <Card
       variant="default"
@@ -20,25 +23,41 @@ export default function FoodCard({ food, onClick }: FoodCardProps) {
       className="relative shadow-sm transition-all duration-150 hover:shadow-md active:scale-[0.98] ring-1 ring-gray-200 cursor-pointer"
       onClick={onClick}
     >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 leading-tight">
-            {food.product_name}
-          </h3>
-          <p className="text-gray-600 text-sm">{food.brand}</p>
-          {food.flavour && (
-            <p className="text-gray-500 text-xs">{food.flavour}</p>
-          )}
+      <div className="flex items-start gap-3 mb-3">
+        <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex-shrink-0">
+          <SafeImagePreview
+            src={food.image_url || ''}
+            alt={food.product_name}
+            fill
+            className="object-contain p-1.5"
+          />
         </div>
-        <span
-          className={`px-2 py-1 rounded text-sm font-medium flex-shrink-0 ${
-            food.food_type === 'dry'
-              ? 'bg-amber-100 text-amber-700'
-              : 'bg-blue-100 text-blue-700'
-          }`}
-        >
-          {food.food_type === 'dry' ? 'Dry' : 'Wet'}
-        </span>
+        <div className="flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                <HighlightedText text={food.product_name} highlight={searchQuery} />
+              </h3>
+              <p className="text-gray-600 text-sm">
+                <HighlightedText text={food.brand} highlight={searchQuery} />
+              </p>
+              {food.flavour && (
+                <p className="text-gray-500 text-xs">
+                  <HighlightedText text={food.flavour} highlight={searchQuery} />
+                </p>
+              )}
+            </div>
+            <span
+              className={`px-2 py-1 rounded text-sm font-medium flex-shrink-0 ${
+                food.food_type === 'dry'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}
+            >
+              {food.food_type === 'dry' ? 'Dry' : 'Wet'}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="pt-3 border-t border-gray-100">

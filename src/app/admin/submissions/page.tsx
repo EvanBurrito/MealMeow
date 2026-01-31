@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { UserSubmittedFood, SubmissionStatus } from '@/types';
 import Header from '@/components/layout/Header';
@@ -10,6 +9,10 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import AdminFoodForm from '@/components/admin/AdminFoodForm';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import PromptDialog from '@/components/ui/PromptDialog';
+import SafeImagePreview from '@/components/ui/SafeImagePreview';
+import Modal from '@/components/ui/Modal';
 
 const STATUS_TABS: { value: SubmissionStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -29,6 +32,18 @@ export default function AdminSubmissionsPage() {
   const [activeTab, setActiveTab] = useState<SubmissionStatus | 'all'>('pending');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [editingSubmission, setEditingSubmission] = useState<UserSubmittedFood | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    submission: UserSubmittedFood | null;
+  }>({ isOpen: false, submission: null });
+  const [rejectDialog, setRejectDialog] = useState<{
+    isOpen: boolean;
+    submission: UserSubmittedFood | null;
+  }>({ isOpen: false, submission: null });
+  const [revisionDialog, setRevisionDialog] = useState<{
+    isOpen: boolean;
+    submission: UserSubmittedFood | null;
+  }>({ isOpen: false, submission: null });
 
   useEffect(() => {
     async function loadData() {
@@ -165,22 +180,35 @@ export default function AdminSubmissionsPage() {
   };
 
   const handleApprove = (submission: UserSubmittedFood) => {
-    if (confirm('Approve this submission and add it to the food database?')) {
-      handleStatusUpdate(submission, 'approved');
+    setConfirmDialog({ isOpen: true, submission });
+  };
+
+  const handleApproveConfirm = async () => {
+    if (confirmDialog.submission) {
+      await handleStatusUpdate(confirmDialog.submission, 'approved');
+      setConfirmDialog({ isOpen: false, submission: null });
     }
   };
 
   const handleReject = (submission: UserSubmittedFood) => {
-    const notes = prompt('Reason for rejection (visible to user):');
-    if (notes !== null) {
-      handleStatusUpdate(submission, 'rejected', notes);
+    setRejectDialog({ isOpen: true, submission });
+  };
+
+  const handleRejectSubmit = async (notes: string) => {
+    if (rejectDialog.submission) {
+      await handleStatusUpdate(rejectDialog.submission, 'rejected', notes);
+      setRejectDialog({ isOpen: false, submission: null });
     }
   };
 
   const handleRequestRevision = (submission: UserSubmittedFood) => {
-    const notes = prompt('What changes are needed? (visible to user):');
-    if (notes !== null && notes.trim()) {
-      handleStatusUpdate(submission, 'needs_revision', notes);
+    setRevisionDialog({ isOpen: true, submission });
+  };
+
+  const handleRevisionSubmit = async (notes: string) => {
+    if (revisionDialog.submission) {
+      await handleStatusUpdate(revisionDialog.submission, 'needs_revision', notes);
+      setRevisionDialog({ isOpen: false, submission: null });
     }
   };
 
@@ -284,7 +312,7 @@ export default function AdminSubmissionsPage() {
                     <div className="flex items-start gap-3 mb-3">
                       {submission.image_url && (
                         <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 shrink-0">
-                          <Image
+                          <SafeImagePreview
                             src={submission.image_url}
                             alt={submission.product_name}
                             fill
@@ -463,30 +491,69 @@ export default function AdminSubmissionsPage() {
       </div>
 
       {/* Edit Modal */}
-      {editingSubmission && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Edit Submission</h2>
-              <button
-                onClick={() => setEditingSubmission(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-6">
-              <AdminFoodForm
-                mode="edit-submission"
-                existingSubmission={editingSubmission}
-                onSuccess={handleEditSuccess}
-              />
-            </div>
-          </div>
+      <Modal
+        isOpen={editingSubmission !== null}
+        onClose={() => setEditingSubmission(null)}
+        size="lg"
+      >
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+          <h2 className="text-lg font-semibold text-gray-900">Edit Submission</h2>
+          <button
+            onClick={() => setEditingSubmission(null)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-      )}
+        <div className="p-6">
+          {editingSubmission && (
+            <AdminFoodForm
+              mode="edit-submission"
+              existingSubmission={editingSubmission}
+              onSuccess={handleEditSuccess}
+            />
+          )}
+        </div>
+      </Modal>
+
+      {/* Approve Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, submission: null })}
+        onConfirm={handleApproveConfirm}
+        title="Approve Submission"
+        message="This will add the food to the database and make it available for recommendations. Are you sure you want to approve this submission?"
+        confirmLabel="Approve"
+        isLoading={processingId === confirmDialog.submission?.id}
+      />
+
+      {/* Reject Dialog */}
+      <PromptDialog
+        isOpen={rejectDialog.isOpen}
+        onClose={() => setRejectDialog({ isOpen: false, submission: null })}
+        onSubmit={handleRejectSubmit}
+        title="Reject Submission"
+        message="Please provide a reason for rejecting this submission. This will be visible to the user."
+        placeholder="Enter rejection reason..."
+        submitLabel="Reject"
+        isLoading={processingId === rejectDialog.submission?.id}
+      />
+
+      {/* Request Revision Dialog */}
+      <PromptDialog
+        isOpen={revisionDialog.isOpen}
+        onClose={() => setRevisionDialog({ isOpen: false, submission: null })}
+        onSubmit={handleRevisionSubmit}
+        title="Request Revision"
+        message="What changes are needed? This feedback will be visible to the user so they can update their submission."
+        placeholder="Describe the required changes..."
+        submitLabel="Request Revision"
+        required
+        minLength={10}
+        isLoading={processingId === revisionDialog.submission?.id}
+      />
     </div>
   );
 }

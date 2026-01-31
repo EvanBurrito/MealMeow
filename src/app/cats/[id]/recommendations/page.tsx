@@ -13,8 +13,13 @@ import RecommendationCard from '@/components/recommendations/RecommendationCard'
 import RecommendationFilters from '@/components/recommendations/RecommendationFilters';
 import FeedbackModal from '@/components/recommendations/FeedbackModal';
 import FoodDetailModal from '@/components/recommendations/FoodDetailModal';
+import SelectFoodPlanModal from '@/components/recommendations/SelectFoodPlanModal';
+import BuildOwnPlanView from '@/components/recommendations/BuildOwnPlanView';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+
+type ViewMode = 'recommendations' | 'build-own';
 
 
 interface RecommendationsPageProps {
@@ -35,14 +40,23 @@ export default function RecommendationsPage({ params }: RecommendationsPageProps
   const [userId, setUserId] = useState<string | null>(null);
   const [feedbackMap, setFeedbackMap] = useState<Map<string, RecommendationFeedback>>(new Map());
 
+  // View mode
+  const [viewMode, setViewMode] = useState<ViewMode>('recommendations');
+
   // Modal state
   const [feedbackModalFood, setFeedbackModalFood] = useState<CatFood | null>(null);
   const [detailModalRec, setDetailModalRec] = useState<FoodRecommendation | null>(null);
+  const [selectPlanRec, setSelectPlanRec] = useState<FoodRecommendation | null>(null);
 
-  // Filters
+  // Filters for Recommendations
   const [foodType, setFoodType] = useState('dry');
   const [budget, setBudget] = useState('');
   const [healthConditions, setHealthConditions] = useState<HealthCondition[]>([]);
+  const [mealsPerDay, setMealsPerDay] = useState(2);
+
+  // Filters for Build Your Own
+  const [buildOwnFoodType, setBuildOwnFoodType] = useState<'all' | 'wet' | 'dry'>('all');
+  const [buildOwnBudget, setBuildOwnBudget] = useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -71,6 +85,7 @@ export default function RecommendationsPage({ params }: RecommendationsPageProps
 
         setCat(catData);
         setHealthConditions(catData.health_conditions || []);
+        setMealsPerDay(catData.meals_per_day || 2);
         const plan = calculateNutritionPlan(catData);
         setNutritionPlan(plan);
 
@@ -266,19 +281,52 @@ export default function RecommendationsPage({ params }: RecommendationsPageProps
         <div className="space-y-6 animate-fade-in">
           <NutritionSummary cat={cat} nutritionPlan={nutritionPlan} />
 
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">
-              Food Recommendations
-            </h2>
-            <RecommendationFilters
-              foodType={foodType}
-              budget={budget}
-              healthConditions={healthConditions}
-              onFoodTypeChange={handleFoodTypeChange}
-              onBudgetChange={handleBudgetChange}
-              onHealthConditionsChange={handleHealthConditionsChange}
-            />
+          {/* View Mode Toggle */}
+          <div className="flex items-center justify-center">
+            <div className="inline-flex bg-gray-100 rounded-xl p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('recommendations')}
+                className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'recommendations'
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Recommendations
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('build-own')}
+                className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  viewMode === 'build-own'
+                    ? 'bg-orange-500 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Build Your Own
+              </button>
+            </div>
           </div>
+
+          {/* Recommendations View */}
+          {viewMode === 'recommendations' && (
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Food Recommendations
+                </h2>
+                <RecommendationFilters
+                  foodType={foodType}
+                  budget={budget}
+                  healthConditions={healthConditions}
+                  mealsPerDay={mealsPerDay}
+                  onFoodTypeChange={handleFoodTypeChange}
+                  onBudgetChange={handleBudgetChange}
+                  onHealthConditionsChange={handleHealthConditionsChange}
+                  onMealsPerDayChange={setMealsPerDay}
+                />
+              </div>
 
           {foods.length === 0 && (
             <Card variant="bordered" className="text-center py-12">
@@ -364,22 +412,123 @@ export default function RecommendationsPage({ params }: RecommendationsPageProps
           )}
 
           {foodType !== 'hybrid' && recommendations.length > 0 && (
-            <div key={foodType} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+            <div key={foodType} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {recommendations.slice(0, 9).map((rec, index) => (
-                <RecommendationCard
+                <div
                   key={rec.food.id}
-                  recommendation={rec}
-                  nutritionPlan={nutritionPlan}
-                  rank={index + 1}
-                  cat={cat}
-                  catId={cat.id}
-                  userId={userId || undefined}
-                  feedback={feedbackMap.get(rec.food.id)}
-                  onOpenFeedbackModal={() => setFeedbackModalFood(rec.food)}
-                  onCardClick={() => setDetailModalRec(rec)}
-                />
+                  className="food-card-animate animate-fade-in-up"
+                  style={{ animationDelay: `${index * 50}ms`, opacity: 0 }}
+                >
+                  <RecommendationCard
+                    recommendation={rec}
+                    nutritionPlan={nutritionPlan}
+                    rank={index + 1}
+                    cat={cat}
+                    catId={cat.id}
+                    userId={userId || undefined}
+                    mealsPerDay={mealsPerDay}
+                    onCardClick={() => setDetailModalRec(rec)}
+                    onSelectPlan={() => setSelectPlanRec(rec)}
+                  />
+                </div>
               ))}
             </div>
+          )}
+            </>
+          )}
+
+          {/* Build Your Own View */}
+          {viewMode === 'build-own' && (
+            <>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Build Your Own Plan
+                  </h2>
+                  <p className="text-gray-600 text-sm mt-1">
+                    Select foods to create a custom meal plan for {cat.name}
+                  </p>
+                </div>
+                {/* Filters - same style as RecommendationFilters */}
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Food Type
+                    </label>
+                    <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                      {(['all', 'dry', 'wet'] as const).map((type, idx) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setBuildOwnFoodType(type)}
+                          className={`px-4 py-2 text-sm font-medium transition-colors ${
+                            buildOwnFoodType === type
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-white text-gray-700 hover:bg-gray-50'
+                          } ${idx > 0 ? 'border-l border-gray-300' : ''}`}
+                        >
+                          {type === 'all' ? 'All' : type === 'dry' ? 'Dry' : 'Wet'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="w-48">
+                    <Input
+                      type="number"
+                      label="Max Budget ($/month)"
+                      value={buildOwnBudget}
+                      onChange={(e) => setBuildOwnBudget(e.target.value)}
+                      placeholder="No limit"
+                      min="0"
+                      step="10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Meals/Day
+                    </label>
+                    <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                      {[1, 2, 3, 4].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => setMealsPerDay(num)}
+                          className={`px-3 py-2 text-sm font-medium transition-colors ${
+                            mealsPerDay === num
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-white text-gray-700 hover:bg-gray-50'
+                          } ${num > 1 ? 'border-l border-gray-300' : ''}`}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {foods.length === 0 ? (
+                <Card variant="bordered" className="text-center py-12">
+                  <div className="text-6xl mb-4">📦</div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    No Foods Available
+                  </h3>
+                  <p className="text-gray-600">
+                    Add foods to the database to start building meal plans.
+                  </p>
+                </Card>
+              ) : (
+                <BuildOwnPlanView
+                  cat={cat}
+                  nutritionPlan={nutritionPlan}
+                  foods={foods}
+                  foodTypeFilter={buildOwnFoodType}
+                  budgetFilter={buildOwnBudget}
+                  mealsPerDay={mealsPerDay}
+                  onMealsPerDayChange={setMealsPerDay}
+                />
+              )}
+            </>
           )}
         </div>
       </main>
@@ -398,17 +547,29 @@ export default function RecommendationsPage({ params }: RecommendationsPageProps
       )}
 
       {/* Food Detail Modal */}
-      {detailModalRec && (
-        <FoodDetailModal
-          food={detailModalRec.food}
-          nutritionPlan={nutritionPlan}
-          dailyAmount={detailModalRec.dailyAmount}
-          amountUnit={detailModalRec.amountUnit}
-          dailyCost={detailModalRec.dailyCost}
-          monthlyCost={detailModalRec.monthlyCost}
-          onClose={() => setDetailModalRec(null)}
-        />
-      )}
+      <FoodDetailModal
+        isOpen={!!detailModalRec}
+        food={detailModalRec?.food ?? null}
+        nutritionPlan={nutritionPlan}
+        dailyAmount={detailModalRec?.dailyAmount ?? 0}
+        amountUnit={detailModalRec?.amountUnit ?? 'cup'}
+        dailyCost={detailModalRec?.dailyCost ?? 0}
+        monthlyCost={detailModalRec?.monthlyCost ?? 0}
+        onClose={() => setDetailModalRec(null)}
+        onSelect={detailModalRec ? () => setSelectPlanRec(detailModalRec) : undefined}
+      />
+
+      {/* Select Food Plan Modal */}
+      <SelectFoodPlanModal
+        isOpen={!!selectPlanRec}
+        onClose={() => setSelectPlanRec(null)}
+        food={selectPlanRec?.food ?? null}
+        cat={cat}
+        dailyAmount={selectPlanRec?.dailyAmount ?? 0}
+        amountUnit={selectPlanRec?.amountUnit ?? 'cup'}
+        dailyCost={selectPlanRec?.dailyCost ?? 0}
+        monthlyCost={selectPlanRec?.monthlyCost ?? 0}
+      />
     </div>
   );
 }
