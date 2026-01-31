@@ -4,18 +4,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
-import { FoodType, LifeStage, UserSubmittedFood } from '@/types';
-import { validateFoodSubmission } from '@/lib/validation';
+import { FoodType, LifeStage, CatFood, UserSubmittedFood } from '@/types';
 import { SPECIAL_BENEFITS } from '@/lib/constants';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Card from '@/components/ui/Card';
 
-interface FoodSubmissionFormProps {
-  userId: string;
+interface AdminFoodFormProps {
+  mode: 'add' | 'edit-food' | 'edit-submission';
+  existingFood?: CatFood;
   existingSubmission?: UserSubmittedFood;
-  mode: 'create' | 'edit';
+  onSuccess?: () => void;
 }
 
 const FOOD_TYPE_OPTIONS = [
@@ -30,39 +30,42 @@ const LIFE_STAGE_OPTIONS = [
   { value: 'senior', label: 'Senior' },
 ];
 
-export default function FoodSubmissionForm({
-  userId,
-  existingSubmission,
+export default function AdminFoodForm({
   mode,
-}: FoodSubmissionFormProps) {
+  existingFood,
+  existingSubmission,
+  onSuccess,
+}: AdminFoodFormProps) {
   const router = useRouter();
   const supabase = createClient();
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [warnings, setWarnings] = useState<string[]>([]);
   const [submitError, setSubmitError] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
 
+  // Get initial values from either existing food or submission
+  const initial = existingFood || existingSubmission;
+
   const [formData, setFormData] = useState({
-    brand: existingSubmission?.brand || '',
-    product_name: existingSubmission?.product_name || '',
-    food_type: (existingSubmission?.food_type || 'dry') as FoodType,
-    life_stage: (existingSubmission?.life_stage || 'all') as LifeStage,
-    kcal_per_cup: existingSubmission?.kcal_per_cup?.toString() || '',
-    kcal_per_can: existingSubmission?.kcal_per_can?.toString() || '',
-    can_size_oz: existingSubmission?.can_size_oz?.toString() || '',
-    price_per_unit: existingSubmission?.price_per_unit?.toString() || '',
-    unit_size: existingSubmission?.unit_size || '',
-    servings_per_unit: existingSubmission?.servings_per_unit?.toString() || '1',
-    protein_pct: existingSubmission?.protein_pct?.toString() || '',
-    fat_pct: existingSubmission?.fat_pct?.toString() || '',
-    fiber_pct: existingSubmission?.fiber_pct?.toString() || '',
-    moisture_pct: existingSubmission?.moisture_pct?.toString() || '',
-    special_benefits: existingSubmission?.special_benefits || [],
-    is_complete_balanced: existingSubmission?.is_complete_balanced ?? true,
-    source_url: existingSubmission?.source_url || '',
-    notes: existingSubmission?.notes || '',
-    image_url: existingSubmission?.image_url || '',
+    brand: initial?.brand || '',
+    product_name: initial?.product_name || '',
+    food_type: (initial?.food_type || 'dry') as FoodType,
+    life_stage: (initial?.life_stage || 'all') as LifeStage,
+    kcal_per_cup: initial?.kcal_per_cup?.toString() || '',
+    kcal_per_can: initial?.kcal_per_can?.toString() || '',
+    can_size_oz: initial?.can_size_oz?.toString() || '',
+    price_per_unit: initial?.price_per_unit?.toString() || '',
+    unit_size: initial?.unit_size || '',
+    servings_per_unit: initial?.servings_per_unit?.toString() || '1',
+    protein_pct: initial?.protein_pct?.toString() || '',
+    fat_pct: initial?.fat_pct?.toString() || '',
+    fiber_pct: initial?.fiber_pct?.toString() || '',
+    moisture_pct: initial?.moisture_pct?.toString() || '',
+    special_benefits: initial?.special_benefits || [],
+    is_complete_balanced: initial?.is_complete_balanced ?? true,
+    image_url: initial?.image_url || '',
+    flavour: initial?.flavour || '',
+    purchase_url: initial?.purchase_url || '',
   });
 
   const handleChange = (
@@ -73,7 +76,6 @@ export default function FoodSubmissionForm({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
-    // Clear error for this field
     if (errors[name]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -114,7 +116,7 @@ export default function FoodSubmissionForm({
     });
 
     try {
-      const fileName = `food-submissions/${userId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const fileName = `food-images/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
 
       const { error: uploadError } = await supabase.storage
         .from('cat-images')
@@ -138,44 +140,41 @@ export default function FoodSubmissionForm({
     }
   };
 
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.brand.trim()) newErrors.brand = 'Brand is required';
+    if (!formData.product_name.trim()) newErrors.product_name = 'Product name is required';
+    if (!formData.price_per_unit || parseFloat(formData.price_per_unit) <= 0) {
+      newErrors.price_per_unit = 'Valid price is required';
+    }
+    if (!formData.unit_size.trim()) newErrors.unit_size = 'Unit size is required';
+    if (!formData.protein_pct) newErrors.protein_pct = 'Protein % is required';
+    if (!formData.fat_pct) newErrors.fat_pct = 'Fat % is required';
+    if (!formData.fiber_pct) newErrors.fiber_pct = 'Fiber % is required';
+
+    if (formData.food_type === 'dry' && !formData.kcal_per_cup) {
+      newErrors.kcal_per_cup = 'Calories per cup is required for dry food';
+    }
+    if (formData.food_type === 'wet') {
+      if (!formData.kcal_per_can) newErrors.kcal_per_can = 'Calories per can is required for wet food';
+      if (!formData.can_size_oz) newErrors.can_size_oz = 'Can size is required for wet food';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError('');
 
-    // Validate form
-    const validation = validateFoodSubmission({
-      brand: formData.brand,
-      product_name: formData.product_name,
-      food_type: formData.food_type,
-      life_stage: formData.life_stage,
-      kcal_per_cup: formData.kcal_per_cup ? parseFloat(formData.kcal_per_cup) : undefined,
-      kcal_per_can: formData.kcal_per_can ? parseFloat(formData.kcal_per_can) : undefined,
-      can_size_oz: formData.can_size_oz ? parseFloat(formData.can_size_oz) : undefined,
-      price_per_unit: formData.price_per_unit ? parseFloat(formData.price_per_unit) : 0,
-      unit_size: formData.unit_size,
-      servings_per_unit: parseFloat(formData.servings_per_unit) || 1,
-      protein_pct: formData.protein_pct ? parseFloat(formData.protein_pct) : undefined,
-      fat_pct: formData.fat_pct ? parseFloat(formData.fat_pct) : undefined,
-      fiber_pct: formData.fiber_pct ? parseFloat(formData.fiber_pct) : undefined,
-      moisture_pct: formData.moisture_pct ? parseFloat(formData.moisture_pct) : 0,
-      special_benefits: formData.special_benefits,
-      is_complete_balanced: formData.is_complete_balanced,
-      source_url: formData.source_url || undefined,
-      notes: formData.notes || undefined,
-    });
-
-    setErrors(validation.errors);
-    setWarnings(validation.warnings);
-
-    if (!validation.valid) {
-      return;
-    }
+    if (!validate()) return;
 
     setIsLoading(true);
 
     try {
-      const submissionData = {
-        submitted_by: userId,
+      const foodData = {
         brand: formData.brand.trim(),
         product_name: formData.product_name.trim(),
         food_type: formData.food_type,
@@ -192,48 +191,105 @@ export default function FoodSubmissionForm({
         moisture_pct: parseFloat(formData.moisture_pct) || 0,
         special_benefits: formData.special_benefits,
         is_complete_balanced: formData.is_complete_balanced,
-        source_url: formData.source_url.trim() || null,
-        notes: formData.notes.trim() || null,
-        image_url: formData.image_url.trim() || null,
-        status: 'pending' as const,
+        image_url: formData.image_url || null,
+        flavour: formData.flavour.trim() || null,
+        purchase_url: formData.purchase_url.trim() || null,
       };
 
-      if (mode === 'create') {
-        const { error } = await supabase.from('user_submitted_foods').insert(submissionData);
+      if (mode === 'add') {
+        // Add directly to cat_foods
+        const { error } = await supabase.from('cat_foods').insert(foodData);
         if (error) throw error;
-      } else if (existingSubmission) {
+        router.push('/database');
+      } else if (mode === 'edit-food' && existingFood) {
+        // Update existing food in cat_foods
+        const { error } = await supabase
+          .from('cat_foods')
+          .update(foodData)
+          .eq('id', existingFood.id);
+        if (error) throw error;
+        router.push('/database');
+      } else if (mode === 'edit-submission' && existingSubmission) {
+        // Update the submission
         const { error } = await supabase
           .from('user_submitted_foods')
-          .update(submissionData)
+          .update(foodData)
           .eq('id', existingSubmission.id);
         if (error) throw error;
+        if (onSuccess) onSuccess();
       }
 
-      router.push('/foods/my-submissions');
       router.refresh();
     } catch (err: unknown) {
-      console.error('Error submitting food:', err);
+      console.error('Error saving food:', err);
       if (err && typeof err === 'object' && 'message' in err) {
         setSubmitError(String(err.message));
       } else {
-        setSubmitError('Failed to submit food');
+        setSubmitError('Failed to save food');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const title = mode === 'add'
+    ? 'Add Food to Database'
+    : mode === 'edit-food'
+    ? 'Edit Food'
+    : 'Edit Submission';
+
   return (
     <Card variant="elevated" className="max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">
-        {mode === 'create' ? 'Submit New Food' : 'Edit Submission'}
-      </h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
       <p className="text-gray-600 text-sm mb-6">
-        Help expand our food database by submitting a cat food product. Please provide accurate
-        information from the product label.
+        {mode === 'add'
+          ? 'Add a new food directly to the database (no approval required).'
+          : 'Edit the food information below.'}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Image Upload Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Product Image</h3>
+          <div className="flex items-start gap-4">
+            {formData.image_url && (
+              <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+                <Image
+                  src={formData.image_url}
+                  alt="Product"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            )}
+            <div className="flex-1 space-y-2">
+              <Input
+                label="Image URL"
+                name="image_url"
+                value={formData.image_url}
+                onChange={handleChange}
+                placeholder="https://..."
+                error={errors.image}
+              />
+              <div className="text-sm text-gray-500">or</div>
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  disabled={imageUploading}
+                />
+                {imageUploading ? (
+                  <span className="text-sm text-gray-600">Uploading...</span>
+                ) : (
+                  <span className="text-sm text-gray-700">Upload Image</span>
+                )}
+              </label>
+            </div>
+          </div>
+        </div>
+
         {/* Basic Info */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
@@ -257,7 +313,7 @@ export default function FoodSubmissionForm({
               required
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <Select
               label="Food Type"
               name="food_type"
@@ -271,6 +327,13 @@ export default function FoodSubmissionForm({
               value={formData.life_stage}
               onChange={handleChange}
               options={LIFE_STAGE_OPTIONS}
+            />
+            <Input
+              label="Flavour"
+              name="flavour"
+              value={formData.flavour}
+              onChange={handleChange}
+              placeholder="e.g., Chicken & Rice"
             />
           </div>
         </div>
@@ -357,14 +420,19 @@ export default function FoodSubmissionForm({
               step="0.1"
             />
           </div>
+          <Input
+            label="Purchase URL"
+            name="purchase_url"
+            value={formData.purchase_url}
+            onChange={handleChange}
+            placeholder="https://..."
+            helperText="Link where users can buy this product"
+          />
         </div>
 
         {/* Nutrition */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Guaranteed Analysis (%)</h3>
-          <p className="text-sm text-gray-500 -mt-2">
-            Enter values from the guaranteed analysis on the package label
-          </p>
           <div className="grid grid-cols-2 gap-4">
             <Input
               type="number"
@@ -458,86 +526,6 @@ export default function FoodSubmissionForm({
           </label>
         </div>
 
-        {/* Product Image */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Product Image (optional)</h3>
-          <div className="flex items-start gap-4">
-            {formData.image_url && (
-              <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                <Image
-                  src={formData.image_url}
-                  alt="Product"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            )}
-            <div className="flex-1 space-y-2">
-              <Input
-                label="Image URL"
-                name="image_url"
-                value={formData.image_url}
-                onChange={handleChange}
-                placeholder="https://..."
-                error={errors.image}
-              />
-              <div className="text-sm text-gray-500">or</div>
-              <label className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  disabled={imageUploading}
-                />
-                {imageUploading ? (
-                  <span className="text-sm text-gray-600">Uploading...</span>
-                ) : (
-                  <span className="text-sm text-gray-700">Upload Image</span>
-                )}
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Additional Info */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Additional Information</h3>
-          <Input
-            label="Product URL (optional)"
-            name="source_url"
-            value={formData.source_url}
-            onChange={handleChange}
-            placeholder="https://..."
-            helperText="Link to the product page for verification"
-          />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notes <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <textarea
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              placeholder="Any additional information about this product..."
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
-            />
-          </div>
-        </div>
-
-        {/* Warnings */}
-        {warnings.length > 0 && (
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <h4 className="font-medium text-amber-800 mb-2">Please Review</h4>
-            <ul className="list-disc list-inside space-y-1 text-sm text-amber-700">
-              {warnings.map((warning, index) => (
-                <li key={index}>{warning}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
         {/* Submit Error */}
         {submitError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
@@ -548,7 +536,7 @@ export default function FoodSubmissionForm({
         {/* Actions */}
         <div className="flex gap-4 pt-4">
           <Button type="submit" isLoading={isLoading} className="flex-1">
-            {mode === 'create' ? 'Submit for Review' : 'Update Submission'}
+            {mode === 'add' ? 'Add to Database' : 'Save Changes'}
           </Button>
           <Button
             type="button"

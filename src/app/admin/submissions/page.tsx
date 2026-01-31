@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { UserSubmittedFood, SubmissionStatus } from '@/types';
 import Header from '@/components/layout/Header';
 import AdminLayout from '@/components/admin/AdminLayout';
+import AdminFoodForm from '@/components/admin/AdminFoodForm';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
@@ -26,6 +28,7 @@ export default function AdminSubmissionsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<SubmissionStatus | 'all'>('pending');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [editingSubmission, setEditingSubmission] = useState<UserSubmittedFood | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -181,6 +184,20 @@ export default function AdminSubmissionsPage() {
     }
   };
 
+  const handleEdit = (submission: UserSubmittedFood) => {
+    setEditingSubmission(submission);
+  };
+
+  const handleEditSuccess = async () => {
+    setEditingSubmission(null);
+    // Reload submissions
+    const { data } = await supabase
+      .from('user_submitted_foods')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setSubmissions(data || []);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -265,6 +282,16 @@ export default function AdminSubmissionsPage() {
                   {/* Info */}
                   <div className="flex-1">
                     <div className="flex items-start gap-3 mb-3">
+                      {submission.image_url && (
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 shrink-0">
+                          <Image
+                            src={submission.image_url}
+                            alt={submission.product_name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      )}
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
                           {submission.product_name}
@@ -375,6 +402,15 @@ export default function AdminSubmissionsPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleEdit(submission)}
+                        disabled={processingId === submission.id}
+                        className="flex-1"
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleRequestRevision(submission)}
                         disabled={processingId === submission.id}
                         className="flex-1"
@@ -394,7 +430,7 @@ export default function AdminSubmissionsPage() {
                   )}
 
                   {submission.status !== 'pending' && (
-                    <div className="lg:w-32 text-right">
+                    <div className="flex lg:flex-col items-end gap-2 lg:w-32">
                       <span
                         className={`px-3 py-1 rounded-full text-sm font-medium ${
                           submission.status === 'approved'
@@ -408,6 +444,13 @@ export default function AdminSubmissionsPage() {
                           ? 'Needs Revision'
                           : submission.status.charAt(0).toUpperCase() + submission.status.slice(1)}
                       </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(submission)}
+                      >
+                        Edit
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -418,6 +461,32 @@ export default function AdminSubmissionsPage() {
           </div>
         </AdminLayout>
       </div>
+
+      {/* Edit Modal */}
+      {editingSubmission && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-2xl w-full my-8 max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Edit Submission</h2>
+              <button
+                onClick={() => setEditingSubmission(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6">
+              <AdminFoodForm
+                mode="edit-submission"
+                existingSubmission={editingSubmission}
+                onSuccess={handleEditSuccess}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

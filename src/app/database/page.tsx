@@ -41,6 +41,10 @@ export default async function DatabasePage() {
             <h1 className="text-3xl font-bold text-gray-900">Food Database</h1>
             <p className="text-gray-600 mt-1">
               Browse all cat foods in our database
+              <span className="mx-2 text-gray-300">·</span>
+              <Link href="/foods/my-submissions" className="text-gray-400 hover:text-orange-500 transition-colors">
+                My submissions
+              </Link>
             </p>
           </div>
           <Link href="/foods/submit">

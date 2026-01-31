@@ -9,6 +9,7 @@ interface AdminLayoutProps {
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'Overview', icon: '📊' },
+  { href: '/admin/add-food', label: 'Add Food', icon: '➕' },
   { href: '/admin/submissions', label: 'Submissions', icon: '📝' },
   { href: '/admin/feedback', label: 'Feedback', icon: '💬' },
   { href: '/admin/analytics', label: 'Analytics', icon: '📈' },
