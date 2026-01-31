@@ -1,6 +1,14 @@
-import { Cat, CatFood, NutritionPlan, FoodRecommendation, HealthCondition } from '@/types';
+import { Cat, CatFood, NutritionPlan, FoodRecommendation, HealthCondition, BadgeType } from '@/types';
 import { HEALTH_CONDITION_REQUIREMENTS } from './constants';
 import { calculateRecommendationScore, determineBadges } from './scoring';
+
+// Badge priority for sorting recommendations (lower = higher priority)
+const BADGE_PRIORITY: Record<BadgeType, number> = {
+  best_value: 1,
+  best_nutrition: 2,
+  best_match: 3,
+  budget_pick: 4,
+};
 
 // Life stage factors for DER calculation
 const LIFE_STAGE_FACTORS = {
@@ -334,6 +342,28 @@ export function generateRecommendations(
     rec.badges = badgeMap.get(rec.food.id) || [];
   }
 
+  // Re-sort: badged foods first (by badge priority), then by overall score
+  recommendations.sort((a, b) => {
+    const aHasBadge = a.badges.length > 0;
+    const bHasBadge = b.badges.length > 0;
+
+    // Badged foods come first
+    if (aHasBadge && !bHasBadge) return -1;
+    if (!aHasBadge && bHasBadge) return 1;
+
+    // Both have badges: sort by highest priority badge
+    if (aHasBadge && bHasBadge) {
+      const aPriority = Math.min(...a.badges.map(badge => BADGE_PRIORITY[badge]));
+      const bPriority = Math.min(...b.badges.map(badge => BADGE_PRIORITY[badge]));
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
+    }
+
+    // Same badge status: sort by overall score
+    return b.score.overall - a.score.overall;
+  });
+
   return recommendations;
 }
 
@@ -347,6 +377,49 @@ export function formatFeedingSchedule(
 ): string {
   const times = mealsPerDay === 2 ? 'twice' : `${mealsPerDay} times`;
   return `${amountPerMeal.toFixed(2)} ${unit}(s) ${times} daily`;
+}
+
+/**
+ * Calculate simple DER from weight and age only (without full Cat profile)
+ * Uses simplified life stage factors:
+ * - Kitten (<12 months): 2.5
+ * - Adult (1-7 years): 1.2 (assumes neutered)
+ * - Senior (7+ years): 1.1
+ */
+export function calculateSimpleDER(weightLbs: number, ageMonths: number): {
+  der: number;
+  rer: number;
+  factor: number;
+  factorName: string;
+} {
+  const kg = lbsToKg(weightLbs);
+  const rer = calculateRER(kg);
+
+  let factor: number;
+  let factorName: string;
+
+  if (ageMonths < 12) {
+    // Kitten
+    factor = 2.5;
+    factorName = 'Kitten (growing)';
+  } else if (ageMonths >= 84) {
+    // Senior (7+ years)
+    factor = 1.1;
+    factorName = 'Senior';
+  } else {
+    // Adult (assumes neutered for safety)
+    factor = 1.2;
+    factorName = 'Adult (neutered)';
+  }
+
+  const der = rer * factor;
+
+  return {
+    der: Math.round(der),
+    rer: Math.round(rer),
+    factor,
+    factorName,
+  };
 }
 
 /**

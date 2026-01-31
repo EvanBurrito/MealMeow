@@ -27,6 +27,12 @@ export interface Cat {
   goal: Goal;
   health_conditions: HealthCondition[];
   profile_image_url: string | null;
+  selected_food_id: string | null;
+  secondary_food_id: string | null;
+  primary_food_amount: number | null;
+  secondary_food_amount: number | null;
+  meals_per_day: number;
+  food_plan_selected_at: string | null;
   created_at: string;
 }
 
@@ -177,6 +183,45 @@ export interface UserSubmittedFood {
   updated_at: string;
 }
 
+export interface CatWithFoodPlan extends Cat {
+  selected_food?: CatFood | null;
+  secondary_food?: CatFood | null;
+}
+
+// Meal Planning Types
+export interface PortionOption {
+  amount: number;
+  unit: string;
+  kcal: number;
+  difference: number;        // From target DER (kcal)
+  percentDifference: number; // Percentage difference from target
+  practicalityScore: number; // 1.0 = whole number, 0.9 = half, etc.
+}
+
+export interface MealPlanOption {
+  id: string;
+  type: 'single' | 'combo';
+  primary: {
+    food: CatFood;
+    dailyAmount: number;
+    unit: string;
+    kcal: number;
+  };
+  complement?: {
+    food: CatFood;
+    dailyAmount: number;
+    unit: string;
+    kcal: number;
+  };
+  totalKcal: number;
+  difference: number;       // kcal difference from target DER
+  percentDifference: number;
+  dailyCost: number;
+  monthlyCost: number;
+  suitabilityNote: string;
+  rank: number;
+}
+
 export interface FoodSubmissionForm {
   brand: string;
   product_name: string;
@@ -199,4 +244,36 @@ export interface FoodSubmissionForm {
   source_url?: string;
   nutrition_label_url?: string;
   notes?: string;
+}
+
+// Build Your Own Plan - Multi-meal selection
+export interface FoodSelection {
+  foodId: string;
+  mealCount: number; // Number of meals this food is used for (1, 2, 3, etc.)
+}
+
+// Saved Meal Plans (without full cat profile)
+export interface SavedMealPlanFoodSelection {
+  foodId: string;
+  mealCount: number;
+}
+
+export interface SavedMealPlan {
+  id: string;
+  user_id: string;
+  plan_name: string;
+  target_der: number;
+  derived_from_weight_lbs: number | null;
+  derived_from_age_months: number | null;
+  meals_per_day: number;
+  food_selections: SavedMealPlanFoodSelection[];
+  total_kcal: number | null;
+  total_daily_cost: number | null;
+  total_monthly_cost: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedMealPlanWithFoods extends SavedMealPlan {
+  foods: CatFood[];
 }
