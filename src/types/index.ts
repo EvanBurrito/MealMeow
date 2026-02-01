@@ -34,6 +34,11 @@ export interface Cat {
   meals_per_day: number;
   food_plan_selected_at: string | null;
   created_at: string;
+  // Community fields
+  is_public?: boolean;
+  bio?: string | null;
+  followers_count?: number;
+  show_details_public?: boolean;
 }
 
 export interface CatFood {
@@ -276,4 +281,63 @@ export interface SavedMealPlan {
 
 export interface SavedMealPlanWithFoods extends SavedMealPlan {
   foods: CatFood[];
+}
+
+// =============================================
+// Community Types
+// =============================================
+
+export type MealPlanCategory =
+  | 'indoor'
+  | 'outdoor'
+  | 'weight_loss'
+  | 'weight_gain'
+  | 'senior'
+  | 'kitten'
+  | 'health';
+
+export interface PublicCat extends Cat {
+  is_public: boolean;
+  bio: string | null;
+  followers_count: number;
+  isFollowing?: boolean;
+}
+
+export interface SharedMealPlan extends SavedMealPlan {
+  cat_id: string | null;
+  is_shared: boolean;
+  category: MealPlanCategory | null;
+  health_focus: HealthCondition[];
+  likes_count: number;
+  saves_count: number;
+  uses_count: number;
+  shared_at: string | null;
+  cat?: PublicCat;
+  isLiked?: boolean;
+  isSaved?: boolean;
+}
+
+export interface SharedMealPlanWithFoods extends SharedMealPlan {
+  foods: CatFood[];
+}
+
+export interface CatFollow {
+  id: string;
+  follower_user_id: string;
+  followed_cat_id: string;
+  created_at: string;
+}
+
+export interface PlanLike {
+  id: string;
+  user_id: string;
+  plan_id: string;
+  created_at: string;
+}
+
+export interface PlanSave {
+  id: string;
+  user_id: string;
+  plan_id: string;
+  created_at: string;
 }
