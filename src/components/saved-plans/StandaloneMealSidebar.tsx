@@ -54,7 +54,7 @@ export default function StandaloneMealSidebar({
   };
 
   const handleSave = async () => {
-    if (!isValid || foods.length === 0) return;
+    if (!isValid || foods.length === 0 || remainingSlots > 0) return;
     setIsLoading(true);
     setError('');
 
@@ -295,11 +295,22 @@ export default function StandaloneMealSidebar({
         <Button
           onClick={handleSave}
           isLoading={isLoading}
-          disabled={!isValid || foods.length === 0}
+          disabled={!isValid || foods.length === 0 || remainingSlots > 0}
           className="w-full"
         >
-          {foods.length === 0 ? 'Select Foods' : planId ? 'Update Plan' : 'Save This Plan'}
+          {foods.length === 0
+            ? 'Select Foods'
+            : remainingSlots > 0
+              ? `Fill ${remainingSlots} More Meal${remainingSlots > 1 ? 's' : ''}`
+              : planId
+                ? 'Update Plan'
+                : 'Save This Plan'}
         </Button>
+        {remainingSlots > 0 && foods.length > 0 && (
+          <p className="text-xs text-blue-600 text-center mt-2">
+            You must fill all {mealsPerDay} meal slots before saving
+          </p>
+        )}
       </div>
     </div>
   );

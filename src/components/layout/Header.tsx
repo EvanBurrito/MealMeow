@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Button from '@/components/ui/Button';
+import CreatePlanChooserModal from '@/components/shared/CreatePlanChooserModal';
 
 interface HeaderProps {
   isLoggedIn?: boolean;
@@ -11,6 +13,7 @@ interface HeaderProps {
 }
 
 export default function Header({ isLoggedIn = false, isAdmin = false }: HeaderProps) {
+  const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -37,6 +40,12 @@ export default function Header({ isLoggedIn = false, isAdmin = false }: HeaderPr
               <Link href="/database">
                 <Button variant="ghost">Database</Button>
               </Link>
+              <Link href="/community">
+                <Button variant="ghost">Community</Button>
+              </Link>
+              <Button variant="ghost" onClick={() => setShowCreatePlanModal(true)}>
+                + Create Plan
+              </Button>
               {isAdmin && (
                 <Link href="/admin">
                   <Button variant="ghost">Admin</Button>
@@ -58,6 +67,13 @@ export default function Header({ isLoggedIn = false, isAdmin = false }: HeaderPr
           )}
         </nav>
       </div>
+
+      {isLoggedIn && (
+        <CreatePlanChooserModal
+          isOpen={showCreatePlanModal}
+          onClose={() => setShowCreatePlanModal(false)}
+        />
+      )}
     </header>
   );
 }

@@ -121,9 +121,9 @@ export default async function DashboardPage() {
       <Header isLoggedIn isAdmin={isAdmin} />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Getting Started Section - Show when no cats or no food plans */}
-        {(cats.length === 0 || !hasFoodPlan) && (
-          <GettingStartedSection hasCats={cats.length > 0} hasFoodPlan={hasFoodPlan} />
+        {/* Getting Started Section - Show only when no cats */}
+        {cats.length === 0 && (
+          <GettingStartedSection hasCats={false} hasFoodPlan={false} />
         )}
 
         {/* Active Food Plans Section */}

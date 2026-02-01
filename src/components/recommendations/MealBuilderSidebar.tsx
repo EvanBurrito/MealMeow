@@ -280,11 +280,20 @@ export default function MealBuilderSidebar({
         <Button
           onClick={handleSave}
           isLoading={isLoading}
-          disabled={!isValid || foods.length === 0}
+          disabled={!isValid || foods.length === 0 || remainingSlots > 0}
           className="w-full"
         >
-          {foods.length === 0 ? 'Select Foods' : 'Save Meal Plan'}
+          {foods.length === 0
+            ? 'Select Foods'
+            : remainingSlots > 0
+              ? `Fill ${remainingSlots} More Meal${remainingSlots > 1 ? 's' : ''}`
+              : 'Save Meal Plan'}
         </Button>
+        {remainingSlots > 0 && foods.length > 0 && (
+          <p className="text-xs text-orange-600 text-center mt-2">
+            You must fill all {mealsPerDay} meal slots before saving
+          </p>
+        )}
       </div>
     </div>
   );

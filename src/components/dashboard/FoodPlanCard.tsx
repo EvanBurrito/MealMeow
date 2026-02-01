@@ -1,12 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Cat, CatFood, FoodRecommendation, RecommendationScore } from '@/types';
 import { calculateNutritionPlan, getKcalPerUnit, getTotalKcalPerUnit, calculateCostPer100kcal, calculateDailyCost, calculateMonthlyCost } from '@/lib/nutrition';
+import { createClient } from '@/lib/supabase/client';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import SafeImagePreview from '@/components/ui/SafeImagePreview';
 import DownloadPDFButton from '@/components/pdf/DownloadPDFButton';
+import ShareActivePlanModal from '@/components/community/ShareActivePlanModal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface FoodPlanCardProps {
   cat: Cat;
@@ -15,9 +20,15 @@ interface FoodPlanCardProps {
 }
 
 export default function FoodPlanCard({ cat, food, secondaryFood }: FoodPlanCardProps) {
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
   const nutritionPlan = calculateNutritionPlan(cat);
   const mealsPerDay = cat.meals_per_day || 2;
   const isCombo = !!secondaryFood && !!cat.secondary_food_id;
+  const isPublic = cat.is_public ?? false;
 
   // Calculate primary food amounts
   const { kcal: primaryKcal, unit: primaryUnit } = getKcalPerUnit(food);
@@ -87,177 +98,245 @@ export default function FoodPlanCard({ cat, food, secondaryFood }: FoodPlanCardP
     badges: [],
   };
 
+  const handleShareClick = () => {
+    if (!isPublic) {
+      // Redirect to edit page to make cat public first
+      router.push(`/cats/${cat.id}/edit`);
+    } else {
+      setShowShareModal(true);
+    }
+  };
+
+  const handleRemovePlan = async () => {
+    setIsRemoving(true);
+    const { error } = await supabase
+      .from('cats')
+      .update({
+        selected_food_id: null,
+        secondary_food_id: null,
+        primary_food_amount: null,
+        secondary_food_amount: null,
+        food_plan_selected_at: null,
+      })
+      .eq('id', cat.id);
+
+    if (!error) {
+      router.refresh();
+    }
+    setIsRemoving(false);
+    setShowRemoveConfirm(false);
+  };
+
   return (
-    <Card variant="elevated" className="overflow-hidden">
-      {/* Header with Food Info */}
-      <div className="flex items-start gap-3 mb-4">
-        {/* Food Image(s) */}
-        <div className="flex -space-x-3 flex-shrink-0">
-          <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 z-10">
-            <SafeImagePreview
-              src={food.image_url || ''}
-              alt={food.product_name}
-              fill
-              className="object-contain p-1"
-            />
-          </div>
-          {isCombo && secondaryFood && (
-            <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
-              <SafeImagePreview
-                src={secondaryFood.image_url || ''}
-                alt={secondaryFood.product_name}
-                fill
-                className="object-contain p-1"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Food Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-              Active Plan
-            </span>
-            {isCombo && (
-              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                Combo
-              </span>
-            )}
-          </div>
-          <h3 className="font-semibold text-gray-900 leading-tight truncate" title={isCombo && secondaryFood ? `${food.product_name} + ${secondaryFood.product_name}` : food.product_name}>
-            {isCombo && secondaryFood
-              ? `${food.product_name} + ${secondaryFood.product_name}`
-              : food.product_name}
-          </h3>
-          <p className="text-gray-600 text-sm">{food.brand}</p>
-        </div>
-      </div>
-
-      {/* Feeding Schedule */}
-      {isCombo ? (
-        // Combo meal display
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center gap-3 bg-orange-50 rounded-xl p-3">
-            <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
+    <>
+      <Card variant="elevated" className="overflow-hidden">
+        {/* Header with Food Info */}
+        <div className="flex items-start gap-3 mb-4">
+          {/* Food Image(s) */}
+          <div className="flex -space-x-3 flex-shrink-0">
+            <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 z-10">
               <SafeImagePreview
                 src={food.image_url || ''}
                 alt={food.product_name}
                 fill
-                className="object-contain p-0.5"
+                className="object-contain p-1"
               />
             </div>
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">{food.product_name}</p>
-              <p className="text-xs text-gray-500">{food.brand}</p>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-bold text-orange-600">{primaryAmountPerMeal}</div>
-              <div className="text-xs text-gray-500">{primaryUnit}(s)/meal</div>
-            </div>
-          </div>
-
-          {secondaryFood && (
-            <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-3">
-              <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
+            {isCombo && secondaryFood && (
+              <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
                 <SafeImagePreview
                   src={secondaryFood.image_url || ''}
                   alt={secondaryFood.product_name}
+                  fill
+                  className="object-contain p-1"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Food Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                Active Plan
+              </span>
+              {isCombo && (
+                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                  Combo
+                </span>
+              )}
+            </div>
+            <h3 className="font-semibold text-gray-900 leading-tight truncate" title={isCombo && secondaryFood ? `${food.product_name} + ${secondaryFood.product_name}` : food.product_name}>
+              {isCombo && secondaryFood
+                ? `${food.product_name} + ${secondaryFood.product_name}`
+                : food.product_name}
+            </h3>
+            <p className="text-gray-600 text-sm">{food.brand}</p>
+          </div>
+        </div>
+
+        {/* Feeding Schedule */}
+        {isCombo ? (
+          // Combo meal display
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center gap-3 bg-orange-50 rounded-xl p-3">
+              <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
+                <SafeImagePreview
+                  src={food.image_url || ''}
+                  alt={food.product_name}
                   fill
                   className="object-contain p-0.5"
                 />
               </div>
               <div className="flex-1 min-w-0 overflow-hidden">
-                <p className="text-sm font-medium text-gray-900 truncate">{secondaryFood.product_name}</p>
-                <p className="text-xs text-gray-500">{secondaryFood.brand}</p>
+                <p className="text-sm font-medium text-gray-900 truncate">{food.product_name}</p>
+                <p className="text-xs text-gray-500">{food.brand}</p>
               </div>
-              <div className="text-right flex-shrink-0">
-                <div className="text-lg font-bold text-blue-600">{secondaryAmountPerMeal}</div>
-                <div className="text-xs text-gray-500">{secondaryUnit}(s)/meal</div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-orange-600">{primaryAmountPerMeal}</div>
+                <div className="text-xs text-gray-500">{primaryUnit}(s)/meal</div>
               </div>
             </div>
-          )}
 
-          <div className="text-center text-sm text-gray-500">
-            {mealsPerDay}x daily
-          </div>
-        </div>
-      ) : (
-        // Single food display - same row format as combo
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center gap-3 bg-orange-50 rounded-xl p-3">
-            <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
-              <SafeImagePreview
-                src={food.image_url || ''}
-                alt={food.product_name}
-                fill
-                className="object-contain p-0.5"
-              />
-            </div>
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">{food.product_name}</p>
-              <p className="text-xs text-gray-500">{food.brand}</p>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <div className="text-lg font-bold text-orange-600">{primaryAmountPerMeal}</div>
-              <div className="text-xs text-gray-500">{primaryUnit}(s)/meal</div>
-            </div>
-          </div>
-
-          <div className="text-center text-sm text-gray-500">
-            {mealsPerDay}x daily
-          </div>
-        </div>
-      )}
-
-      {/* Daily Summary */}
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm text-gray-600">Daily Total</div>
-            {isCombo ? (
-              <div className="text-lg font-bold text-gray-900">
-                {primaryDailyAmount} {primaryUnit}(s) + {secondaryDailyAmount} {secondaryUnit}(s)
-              </div>
-            ) : (
-              <div className="text-lg font-bold text-gray-900">
-                {primaryDailyAmount} {primaryUnit}(s)
+            {secondaryFood && (
+              <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-3">
+                <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
+                  <SafeImagePreview
+                    src={secondaryFood.image_url || ''}
+                    alt={secondaryFood.product_name}
+                    fill
+                    className="object-contain p-0.5"
+                  />
+                </div>
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <p className="text-sm font-medium text-gray-900 truncate">{secondaryFood.product_name}</p>
+                  <p className="text-xs text-gray-500">{secondaryFood.brand}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-lg font-bold text-blue-600">{secondaryAmountPerMeal}</div>
+                  <div className="text-xs text-gray-500">{secondaryUnit}(s)/meal</div>
+                </div>
               </div>
             )}
+
+            <div className="text-center text-sm text-gray-500">
+              {mealsPerDay}x daily
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-600">Est. Cost</div>
-            <div className="text-lg font-bold text-green-600">
-              ${monthlyCost.toFixed(2)}/mo
+        ) : (
+          // Single food display - same row format as combo
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center gap-3 bg-orange-50 rounded-xl p-3">
+              <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
+                <SafeImagePreview
+                  src={food.image_url || ''}
+                  alt={food.product_name}
+                  fill
+                  className="object-contain p-0.5"
+                />
+              </div>
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <p className="text-sm font-medium text-gray-900 truncate">{food.product_name}</p>
+                <p className="text-xs text-gray-500">{food.brand}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="text-lg font-bold text-orange-600">{primaryAmountPerMeal}</div>
+                <div className="text-xs text-gray-500">{primaryUnit}(s)/meal</div>
+              </div>
+            </div>
+
+            <div className="text-center text-sm text-gray-500">
+              {mealsPerDay}x daily
+            </div>
+          </div>
+        )}
+
+        {/* Daily Summary */}
+        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-gray-600">Daily Total</div>
+              {isCombo ? (
+                <div className="text-lg font-bold text-gray-900">
+                  {primaryDailyAmount} {primaryUnit}(s) + {secondaryDailyAmount} {secondaryUnit}(s)
+                </div>
+              ) : (
+                <div className="text-lg font-bold text-gray-900">
+                  {primaryDailyAmount} {primaryUnit}(s)
+                </div>
+              )}
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-gray-600">Est. Cost</div>
+              <div className="text-lg font-bold text-green-600">
+                ${monthlyCost.toFixed(2)}/mo
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Quick Info */}
-      <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-        <span>{totalKcal} kcal/day ({nutritionPlan.der} needed)</span>
-        <span>${totalDailyCost.toFixed(2)}/day</span>
-      </div>
+        {/* Quick Info */}
+        <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+          <span>{totalKcal} kcal/day ({nutritionPlan.der} needed)</span>
+          <span>${totalDailyCost.toFixed(2)}/day</span>
+        </div>
 
-      {/* Actions */}
-      <div className="flex gap-2">
-        <Link href={`/cats/${cat.id}/recommendations`} className="flex-1">
-          <Button variant="outline" size="sm" className="w-full">
-            Change Plan
+        {/* Actions */}
+        <div className="flex gap-2">
+          <Link href={`/cats/${cat.id}/recommendations`} className="flex-1">
+            <Button variant="outline" size="sm" className="w-full">
+              Change Plan
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRemoveConfirm(true)}
+            className="text-red-600 hover:bg-red-50 hover:border-red-200"
+          >
+            Remove
           </Button>
-        </Link>
-        <Link href={`/cats/${cat.id}`}>
-          <Button variant="outline" size="sm">
-            View Cat
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShareClick}
+            className={isPublic ? 'text-orange-600 hover:bg-orange-50 hover:border-orange-200' : 'text-gray-400'}
+            title={isPublic ? 'Share to community' : 'Make profile public to share'}
+          >
+            Share
           </Button>
-        </Link>
-        <DownloadPDFButton
-          cat={cat}
-          nutritionPlan={nutritionPlan}
-          recommendation={primaryRecommendation}
-        />
-      </div>
-    </Card>
+          <DownloadPDFButton
+            cat={cat}
+            nutritionPlan={nutritionPlan}
+            recommendation={primaryRecommendation}
+          />
+        </div>
+      </Card>
+
+      {/* Share Modal */}
+      <ShareActivePlanModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        cat={cat}
+        food={food}
+        secondaryFood={secondaryFood}
+        onShared={() => {
+          setShowShareModal(false);
+          router.refresh();
+        }}
+      />
+
+      {/* Remove Plan Confirmation */}
+      <ConfirmDialog
+        isOpen={showRemoveConfirm}
+        title="Remove Food Plan"
+        message={`Remove ${cat.name}'s current food plan? You can select a new one anytime.`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={handleRemovePlan}
+        onClose={() => setShowRemoveConfirm(false)}
+        isLoading={isRemoving}
+      />
+    </>
   );
 }

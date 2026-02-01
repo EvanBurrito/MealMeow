@@ -33,12 +33,13 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect dashboard, cats, and saved-plans routes
+  // Protect dashboard, cats, saved-plans, and community routes
   if (
     !user &&
     (request.nextUrl.pathname.startsWith('/dashboard') ||
       request.nextUrl.pathname.startsWith('/cats') ||
-      request.nextUrl.pathname.startsWith('/saved-plans'))
+      request.nextUrl.pathname.startsWith('/saved-plans') ||
+      request.nextUrl.pathname.startsWith('/community'))
   ) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';

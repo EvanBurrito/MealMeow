@@ -1,24 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { SavedMealPlanWithFoods, CatFood } from '@/types';
-import { getKcalPerUnit, getTotalKcalPerUnit, calculateCostPer100kcal } from '@/lib/nutrition';
+import { SavedMealPlanWithFoods, CatFood, Cat } from '@/types';
+import { getKcalPerUnit } from '@/lib/nutrition';
 import { createClient } from '@/lib/supabase/client';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import SafeImagePreview from '@/components/ui/SafeImagePreview';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { SharePlanModal } from '@/components/community';
+import SavedPlanPDFButton from '@/components/pdf/SavedPlanPDFButton';
+import UsePlanModal from '@/components/saved-plans/UsePlanModal';
 
 interface SavedPlanCardProps {
   plan: SavedMealPlanWithFoods;
   onDeleted?: () => void;
+  onShared?: () => void;
 }
 
-export default function SavedPlanCard({ plan, onDeleted }: SavedPlanCardProps) {
+export default function SavedPlanCard({ plan, onDeleted, onShared }: SavedPlanCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showUsePlanModal, setShowUsePlanModal] = useState(false);
+  const [userCats, setUserCats] = useState<Cat[]>([]);
+  const [isShared, setIsShared] = useState((plan as SavedMealPlanWithFoods & { is_shared?: boolean }).is_shared ?? false);
   const supabase = createClient();
+
+  // Fetch user's cats when share modal opens
+  useEffect(() => {
+    if (showShareModal) {
+      const fetchCats = async () => {
+        const { data } = await supabase
+          .from('cats')
+          .select('*')
+          .order('name');
+        if (data) {
+          setUserCats(data as Cat[]);
+        }
+      };
+      fetchCats();
+    }
+  }, [showShareModal, supabase]);
 
   // Get food objects that match the selections
   const foodMap = new Map<string, CatFood>();
@@ -187,15 +211,37 @@ export default function SavedPlanCard({ plan, onDeleted }: SavedPlanCardProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowUsePlanModal(true)}
+          >
+            Use
+          </Button>
           <Link
             href={`/saved-plans/${plan.id}/edit`}
-            className="flex-1"
+            className="flex-1 min-w-[80px]"
           >
             <Button variant="outline" size="sm" className="w-full">
-              Edit Plan
+              Edit
             </Button>
           </Link>
+          {!isShared ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowShareModal(true)}
+              className="text-orange-600 hover:bg-orange-50 hover:border-orange-200"
+            >
+              Share
+            </Button>
+          ) : (
+            <span className="inline-flex items-center px-3 py-1.5 text-sm text-green-600 bg-green-50 rounded-lg">
+              Shared
+            </span>
+          )}
+          <SavedPlanPDFButton plan={plan} />
           <Button
             variant="outline"
             size="sm"
@@ -207,6 +253,24 @@ export default function SavedPlanCard({ plan, onDeleted }: SavedPlanCardProps) {
           </Button>
         </div>
       </Card>
+
+      <SharePlanModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        plan={plan}
+        cats={userCats}
+        onShared={() => {
+          setIsShared(true);
+          setShowShareModal(false);
+          onShared?.();
+        }}
+      />
+
+      <UsePlanModal
+        isOpen={showUsePlanModal}
+        onClose={() => setShowUsePlanModal(false)}
+        plan={plan}
+      />
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}
